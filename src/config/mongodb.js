@@ -1,0 +1,30 @@
+const { MongoClient, ServerApiVersion } = require("mongodb");
+const mongoose = require('mongoose');
+const env = require('./env');
+
+const uri = env.mongodbUri;
+
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    },
+});
+
+const database = client.db("FP-HCK86");
+
+const connectDB = async () => {
+    try {
+        await mongoose.connect(env.mongodbUri);
+        console.log('MongoDB connected successfully');
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        // process.exit(1);
+    }
+};
+
+module.exports = {
+    database,
+    connectDB
+}

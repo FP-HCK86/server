@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
+
 const { createSchedule, getSchedules } = require('../controllers/schedules.controller');
+
 
 const mockAuth = (req, res, next)=>{
     req.user = {id :'66f000000000000000000001'}
@@ -11,6 +13,7 @@ const mockAuth = (req, res, next)=>{
 
 router.post('/', mockAuth, createSchedule);
 router.get('/', mockAuth, getSchedules)
+
 
 
 module.exports = router;

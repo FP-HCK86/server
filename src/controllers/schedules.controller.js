@@ -42,8 +42,52 @@ const createSchedule = async (req, res) => {
     console.error('Error creating schedule:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+
+const getSchedules = async (req, res) => {
+  try {
+    const { day, month, week, backdate } = req.query;
+    const user_id = req.user.id;
+
+    // Build filter
+    const filter = { user_id };
+    const now = new Date();
+
+    if (backdate) {
+      // Filter backdate: scheduled_at < now
+      filter.scheduled_at = { $lt: now };
+    } else if (day) {
+      // Filter hari ini
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      filter.scheduled_at = { $gte: startOfDay, $lt: endOfDay };
+    } else if (month) {
+      // Filter bulan ini
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      filter.scheduled_at = { $gte: startOfMonth, $lt: endOfMonth };
+    } else if (week) {
+      // Filter minggu ini (Senin - Minggu)
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay() + 1);  // Senin
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      filter.scheduled_at = { $gte: startOfWeek, $lt: endOfWeek };
+    }
+
+    // Query schedules
+    const schedules = await Schedule.find(filter).sort({ scheduled_at: -1 });
+
+    res.status(200).json({ schedules });
+  } catch (error) {
+    console.error('Error fetching schedules:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 module.exports = {
-  createSchedule
-};
+  createSchedule,
+  getSchedules
+}

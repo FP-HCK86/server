@@ -42,9 +42,7 @@ const createSchedule = async (req, res) => {
     console.error('Error creating schedule:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-};
-
-<<<<<<< HEAD
+}
 
 
 const getSchedules = async (req, res) => {
@@ -92,8 +90,4 @@ const getSchedules = async (req, res) => {
 module.exports = {
   createSchedule,
   getSchedules
-=======
-module.exports = {
-  createSchedule
->>>>>>> 570c3bc43090f329ec9e3067a9a53a868571a561
-};
+}

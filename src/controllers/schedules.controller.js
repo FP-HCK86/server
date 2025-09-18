@@ -87,7 +87,26 @@ const getSchedules = async (req, res) => {
   }
 };
 
+const getScheduleById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user.id;
+
+    const schedule = await Schedule.findOne({ _id: id, user_id });
+    if (!schedule) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    res.status(200).json({ schedule });
+  } catch (error) {
+    console.error('Error fetching schedule by ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
 module.exports = {
   createSchedule,
-  getSchedules
-}
+  getSchedules,
+  getScheduleById
+};

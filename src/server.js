@@ -13,6 +13,10 @@ app.use(express.urlencoded({ extended: true }))
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
+// Routes
+const schedulesRoutes = require('./routes/schedules.routes');
+app.use('/schedules', schedulesRoutes);
+
 // CHECK CONNECTION DATABASE
 connectDB();
 

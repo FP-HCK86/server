@@ -5,7 +5,7 @@ const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
 
 const authRoutes = require('./routes/auth.routes')
-const PORT = 3000;
+const PORT = env.port;
 const app = express();
 
 app.use(cors());
@@ -26,6 +26,9 @@ app.use('/schedules', schedulesRoutes);
 const aiRoutes = require('./routes/ai.routes');
 app.use('/ai', aiRoutes);
 
+const videosRouter = require('./routes/videos.routes');
+app.use('/videos', videosRouter);
+
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
@@ -34,5 +37,5 @@ app.use(errorHandler);
 connectDB();
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

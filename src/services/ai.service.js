@@ -7,44 +7,46 @@ const { openai } = require('../config/openai');
 const generateContent = async (prompt, persona = null) => {
   try {
     // Build persona-aware system prompt
-    let systemPrompt = `You are an expert video content creator and social media strategist. 
-    Create comprehensive video content based on user prompts that's optimized for social media platforms (Instagram, TikTok, YouTube Shorts).`;
+    let systemPrompt = `Kamu adalah ahli pembuat konten video dan strategi media sosial. 
+    Buat konten video yang komprehensif berdasarkan prompt pengguna yang dioptimalkan untuk platform media sosial (Instagram, TikTok, YouTube Shorts).
+    
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.`;
     
     // Add persona context if available
     if (persona) {
-      systemPrompt += `\n\nCREATOR PERSONA CONTEXT:
-      - Content Niche: ${persona.contentNiche}
-      - Platform Priority: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
-      - Content Style: ${persona.contentStyle.replace('_', ' ')}
-      - Brand Voice: ${persona.brandVoice.replace('_', ' ')}
+      systemPrompt += `\n\nKONTEKS PERSONA KREATOR:
+      - Niche Konten: ${persona.contentNiche}
+      - Platform Utama: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
+      - Gaya Konten: ${persona.contentStyle.replace('_', ' ')}
+      - Suara Brand: ${persona.brandVoice.replace('_', ' ')}
       - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} (${persona.targetAudience.location})
-      - Video Duration: ${persona.videoDurationPreference}
-      - Content Goals: ${persona.contentGoals.join(', ')}
+      - Durasi Video: ${persona.videoDurationPreference}
+      - Tujuan Konten: ${persona.contentGoals.join(', ')}
       
-      IMPORTANT: Tailor ALL content to match this creator's persona, voice, and audience preferences.`;
+      PENTING: Sesuaikan SEMUA konten dengan persona, suara, dan preferensi audience kreator ini.`;
     }
     
     systemPrompt += `
     
-    Always respond with a valid JSON object containing ALL these fields:
+    Selalu respond dengan JSON object yang valid berisi SEMUA field berikut:
     {
-      "script": "Detailed video script with clear narrative flow",
-      "storyboard": "Scene-by-scene breakdown with visual descriptions",
-      "hooks": ["3 engaging hooks to capture attention"],
-      "tags": ["10 relevant hashtags without # symbol"],
-      "caption": "Engaging social media caption with emojis",
-      "thumbnailIdeas": ["3 thumbnail concept ideas"],
-      "targetAudience": "Primary audience description",
-      "contentPillars": ["3 main themes/topics this content covers"],
-      "callToAction": "Clear CTA for audience engagement",
-      "estimatedDuration": "Estimated video length (30s, 60s, etc.)",
-      "difficulty": "Content creation difficulty (Beginner/Intermediate/Advanced)",
-      "props": ["Required props or materials"],
-      "locations": ["Suggested filming locations"],
-      "musicSuggestion": "Type of background music recommended"
+      "script": "Skrip video detail dengan alur cerita yang jelas dalam bahasa Indonesia",
+      "storyboard": "Breakdown scene-by-scene dengan deskripsi visual dalam bahasa Indonesia",
+      "hooks": ["3 hook menarik untuk menarik perhatian dalam bahasa Indonesia"],
+      "tags": ["10 hashtag relevan tanpa simbol # dalam bahasa Indonesia/Inggris"],
+      "caption": "Caption media sosial yang engaging dengan emoji dalam bahasa Indonesia",
+      "thumbnailIdeas": ["3 ide konsep thumbnail dalam bahasa Indonesia"],
+      "targetAudience": "Deskripsi audience utama dalam bahasa Indonesia",
+      "contentPillars": ["3 tema/topik utama yang dicakup konten ini dalam bahasa Indonesia"],
+      "callToAction": "CTA yang jelas untuk engagement audience dalam bahasa Indonesia",
+      "estimatedDuration": "Estimasi durasi video (30s, 60s, dll)",
+      "difficulty": "Tingkat kesulitan pembuatan konten (Pemula/Menengah/Lanjutan)",
+      "props": ["Props atau materi yang dibutuhkan dalam bahasa Indonesia"],
+      "locations": ["Saran lokasi syuting dalam bahasa Indonesia"],
+      "musicSuggestion": "Jenis musik latar yang direkomendasikan dalam bahasa Indonesia"
     }
     
-    Make content engaging, actionable, and optimized for high engagement rates.`;
+    Buat konten yang engaging, actionable, dan dioptimalkan untuk tingkat engagement tinggi. Gunakan bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -80,19 +82,21 @@ const generateContent = async (prompt, persona = null) => {
  */
 const chatWithAI = async (messages) => {
   try {
-    const systemPrompt = `You are a highly creative video content strategist and brainstorming partner. 
-    Help users develop engaging video content ideas with specific, actionable advice.
+    const systemPrompt = `Kamu adalah strategi konten video yang sangat kreatif dan partner brainstorming. 
+    Bantu pengguna mengembangkan ide konten video yang engaging dengan saran yang spesifik dan actionable.
     
-    Focus on:
-    - Creative video concepts and storytelling techniques
-    - Audience engagement strategies
-    - Platform-specific optimization (Instagram, TikTok, YouTube)
-    - Trending topics and viral content patterns
-    - Production tips and techniques
-    - Content series and campaign ideas
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.
     
-    Be enthusiastic, creative, and provide detailed, actionable suggestions. 
-    Ask follow-up questions to better understand their vision and goals.`;
+    Fokus pada:
+    - Konsep video kreatif dan teknik storytelling
+    - Strategi engagement audience
+    - Optimisasi platform spesifik (Instagram, TikTok, YouTube)
+    - Topik trending dan pola konten viral
+    - Tips dan teknik produksi
+    - Ide seri konten dan kampanye
+    
+    Jadilah antusias, kreatif, dan berikan saran yang detail dan actionable. 
+    Ajukan pertanyaan lanjutan untuk lebih memahami visi dan tujuan mereka.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -127,19 +131,21 @@ const analyzeContent = async (contentData) => {
   try {
     const { title, description, currentScript, targetAudience, platform } = contentData;
     
-    const systemPrompt = `You are an expert content analyst and improvement strategist.
-    Analyze the provided content and give comprehensive feedback and suggestions.
+    const systemPrompt = `Kamu adalah ahli analisis konten dan strategi perbaikan.
+    Analisis konten yang diberikan dan berikan feedback serta saran yang komprehensif.
     
-    Always respond with a valid JSON object containing:
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.
+    
+    Selalu respond dengan JSON object yang valid berisi:
     {
-      "analysis": "Detailed analysis of current content strengths and weaknesses",
-      "improvements": ["5 specific improvement suggestions"],
-      "hooks": ["3 better hook alternatives"],
-      "engagement": ["3 engagement optimization tips"],
-      "trending": ["3 ways to align with current trends"],
-      "audience": "Refined target audience insights",
-      "competition": "Competitive analysis insights",
-      "nextSteps": ["3 actionable next steps"]
+      "analysis": "Analisis detail tentang kekuatan dan kelemahan konten saat ini dalam bahasa Indonesia",
+      "improvements": ["5 saran perbaikan spesifik dalam bahasa Indonesia"],
+      "hooks": ["3 alternatif hook yang lebih baik dalam bahasa Indonesia"],
+      "engagement": ["3 tips optimisasi engagement dalam bahasa Indonesia"],
+      "trending": ["3 cara untuk sejalan dengan trend terkini dalam bahasa Indonesia"],
+      "audience": "Insight target audience yang lebih tepat dalam bahasa Indonesia",
+      "competition": "Insight analisis kompetitor dalam bahasa Indonesia",
+      "nextSteps": ["3 langkah selanjutnya yang actionable dalam bahasa Indonesia"]
     }`;
 
     const userPrompt = `Analyze this content:
@@ -182,27 +188,29 @@ const analyzeContent = async (contentData) => {
  */
 const generateTrendingIdeas = async (niche, platform = 'instagram') => {
   try {
-    const systemPrompt = `You are a trend-savvy content strategist who stays updated with the latest social media trends.
-    Generate trending video content ideas for the specified niche and platform.
+    const systemPrompt = `Kamu adalah strategi konten yang mengikuti trend terkini dan selalu update dengan trend media sosial terbaru.
+    Generate ide konten video trending untuk niche dan platform yang ditentukan.
     
-    Always respond with a valid JSON object containing:
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.
+    
+    Selalu respond dengan JSON object yang valid berisi:
     {
       "trendingIdeas": [
         {
-          "title": "Catchy video title",
-          "concept": "Detailed concept description",
-          "hook": "Attention-grabbing opening line",
-          "trendElement": "What trending element it uses",
-          "difficulty": "Easy/Medium/Hard",
-          "engagement": "Expected engagement level (High/Medium/Low)"
+          "title": "Judul video yang menarik dalam bahasa Indonesia",
+          "concept": "Deskripsi konsep detail dalam bahasa Indonesia",
+          "hook": "Kalimat pembuka yang menarik perhatian dalam bahasa Indonesia",
+          "trendElement": "Elemen trending apa yang digunakan dalam bahasa Indonesia",
+          "difficulty": "Mudah/Sedang/Sulit",
+          "engagement": "Level engagement yang diharapkan (Tinggi/Sedang/Rendah)"
         }
       ],
-      "currentTrends": ["5 current trends in this niche"],
-      "hashtags": ["10 trending hashtags"],
-      "tips": ["3 tips for viral potential"]
+      "currentTrends": ["5 trend terkini dalam niche ini dalam bahasa Indonesia"],
+      "hashtags": ["10 hashtag trending dalam bahasa Indonesia/Inggris"],
+      "tips": ["3 tips untuk potensi viral dalam bahasa Indonesia"]
     }
     
-    Generate 5 trending ideas that have high viral potential.`;
+    Generate 5 ide trending yang memiliki potensi viral tinggi. Gunakan bahasa Indonesia yang natural.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -237,34 +245,36 @@ const generateTrendingIdeas = async (niche, platform = 'instagram') => {
  */
 const chatWithPersona = async (messages, persona = null) => {
   try {
-    let systemPrompt = `You are a highly creative video content strategist and brainstorming partner. 
-    Help users develop engaging video content ideas with specific, actionable advice.`;
+    let systemPrompt = `Kamu adalah strategi konten video yang sangat kreatif dan partner brainstorming. 
+    Bantu pengguna mengembangkan ide konten video yang engaging dengan saran yang spesifik dan actionable.
+    
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.`;
     
     // Add persona context if available
     if (persona) {
-      systemPrompt += `\n\nCREATOR PERSONA CONTEXT:
-      - Content Niche: ${persona.contentNiche}
-      - Platform Priority: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
-      - Content Style: ${persona.contentStyle.replace('_', ' ')}
-      - Brand Voice: ${persona.brandVoice.replace('_', ' ')}
-      - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} in ${persona.targetAudience.location}
-      - Content Goals: ${persona.contentGoals.join(', ')}
+      systemPrompt += `\n\nKONTEKS PERSONA KREATOR:
+      - Niche Konten: ${persona.contentNiche}
+      - Platform Utama: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
+      - Gaya Konten: ${persona.contentStyle.replace('_', ' ')}
+      - Suara Brand: ${persona.brandVoice.replace('_', ' ')}
+      - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} di ${persona.targetAudience.location}
+      - Tujuan Konten: ${persona.contentGoals.join(', ')}
       
-      IMPORTANT: Provide advice that aligns with this creator's established persona and goals.`;
+      PENTING: Berikan saran yang selaras dengan persona dan tujuan kreator ini.`;
     }
     
     systemPrompt += `
     
-    Focus on:
-    - Creative video concepts and storytelling techniques
-    - Audience engagement strategies
-    - Platform-specific optimization (Instagram, TikTok, YouTube)
-    - Trending topics and viral content patterns
-    - Production tips and techniques
-    - Content series and campaign ideas
+    Fokus pada:
+    - Konsep video kreatif dan teknik storytelling
+    - Strategi engagement audience
+    - Optimisasi platform spesifik (Instagram, TikTok, YouTube)
+    - Topik trending dan pola konten viral
+    - Tips dan teknik produksi
+    - Ide seri konten dan kampanye
     
-    Be enthusiastic, creative, and provide detailed, actionable suggestions. 
-    Ask follow-up questions to better understand their vision and goals.`;
+    Jadilah antusias, kreatif, dan berikan saran yang detail dan actionable. 
+    Ajukan pertanyaan lanjutan untuk lebih memahami visi dan tujuan mereka.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -298,20 +308,22 @@ const analyzeContentWithPersona = async (contentData, persona = null) => {
   try {
     const { title, description, currentScript, targetAudience, platform } = contentData;
     
-    let systemPrompt = `You are an expert content analyst and improvement strategist.
-    Analyze the provided content and give comprehensive feedback and suggestions.`;
+    let systemPrompt = `Kamu adalah ahli analisis konten dan strategi perbaikan.
+    Analisis konten yang diberikan dan berikan feedback serta saran yang komprehensif.
+    
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.`;
     
     // Add persona context if available
     if (persona) {
-      systemPrompt += `\n\nCREATOR PERSONA CONTEXT:
-      - Content Niche: ${persona.contentNiche}
-      - Platform Priority: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
-      - Content Style: ${persona.contentStyle.replace('_', ' ')}
-      - Brand Voice: ${persona.brandVoice.replace('_', ' ')}
-      - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} in ${persona.targetAudience.location}
-      - Content Goals: ${persona.contentGoals.join(', ')}
+      systemPrompt += `\n\nKONTEKS PERSONA KREATOR:
+      - Niche Konten: ${persona.contentNiche}
+      - Platform Utama: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
+      - Gaya Konten: ${persona.contentStyle.replace('_', ' ')}
+      - Suara Brand: ${persona.brandVoice.replace('_', ' ')}
+      - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} di ${persona.targetAudience.location}
+      - Tujuan Konten: ${persona.contentGoals.join(', ')}
       
-      IMPORTANT: Analyze and suggest improvements that align with this creator's persona and brand voice.`;
+      PENTING: Analisis dan berikan saran perbaikan yang selaras dengan persona dan brand voice kreator ini.`;
     }
     
     systemPrompt += `
@@ -368,17 +380,19 @@ const analyzeContentWithPersona = async (contentData, persona = null) => {
  */
 const generateTrendingIdeasWithPersona = async (persona) => {
   try {
-    const systemPrompt = `You are a trend-savvy content strategist who stays updated with the latest social media trends.
-    Generate trending video content ideas that perfectly match the creator's persona and goals.
+    const systemPrompt = `Kamu adalah strategi konten yang mengikuti trend terkini dan selalu update dengan trend media sosial terbaru.
+    Generate ide konten video trending yang sempurna sesuai dengan persona dan goals kreator.
     
-    CREATOR PERSONA CONTEXT:
-    - Content Niche: ${persona.contentNiche}
-    - Platform Priority: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
-    - Content Style: ${persona.contentStyle.replace('_', ' ')}
-    - Brand Voice: ${persona.brandVoice.replace('_', ' ')}
-    - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} in ${persona.targetAudience.location}
-    - Video Duration: ${persona.videoDurationPreference}
-    - Content Goals: ${persona.contentGoals.join(', ')}
+    PENTING: Berikan semua respon dalam bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.
+    
+    KONTEKS PERSONA KREATOR:
+    - Niche Konten: ${persona.contentNiche}
+    - Platform Utama: ${persona.platformPriority.replace('_', ' ').toUpperCase()}
+    - Gaya Konten: ${persona.contentStyle.replace('_', ' ')}
+    - Suara Brand: ${persona.brandVoice.replace('_', ' ')}
+    - Target Audience: ${persona.targetAudience.ageGroup.replace('_', ' ')} di ${persona.targetAudience.location}
+    - Durasi Video: ${persona.videoDurationPreference}
+    - Tujuan Konten: ${persona.contentGoals.join(', ')}
     
     Always respond with a valid JSON object containing:
     {

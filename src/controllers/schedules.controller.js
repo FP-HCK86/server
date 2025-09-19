@@ -201,6 +201,28 @@ class SchedulesController {
       next(error);
     }
   }
+
+  static async deleteSchedule(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+      
+      const schedule = await Schedule.findOneAndDelete({
+        _id: id,
+        user_id,
+        status: "pending",
+      });
+      if (!schedule) {
+        const error = new Error("Schedule not found or not pending");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      res.status(200).json({ message: "Schedule deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = SchedulesController;

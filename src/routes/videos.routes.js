@@ -7,6 +7,7 @@ const { authenticateToken } = require('../middlewares/auth');
 const {
     uploadVideo: uploadVideoCtrl,
     listMyVideos,
+    getVideo,
     updateVideo,
     deleteVideo,
 } = require('../controllers/videos.controller');
@@ -19,6 +20,9 @@ router.post('/', authenticateToken, uploadVideo.single('file'), uploadVideoCtrl)
 
 // READ (list milik user)
 router.get('/', authenticateToken, listMyVideos);
+
+// READ (detail video milik user)
+router.get('/:id', authenticateToken, getVideo);
 
 // UPDATE (metadata saja ATAU ganti file + metadata)
 // - Metadata: kirim JSON body (caption/hashtags/title)

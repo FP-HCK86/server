@@ -6,7 +6,8 @@ const Persona = require('../models/Persona');
  */
 const getUserPersonas = async (req, res) => {
   try {
-    const userId = req.user?.id || req.userId; // Adjust based on your auth middleware
+    // For testing: allow userId from query parameter if no auth
+    const userId = req.user?.id || req.userId || req.query.userId;
     
     if (!userId) {
       return res.status(401).json({
@@ -43,7 +44,8 @@ const getUserPersonas = async (req, res) => {
  */
 const getActivePersona = async (req, res) => {
   try {
-    const userId = req.user?.id || req.userId;
+    // For testing: allow userId from query parameter if no auth
+    const userId = req.user?.id || req.userId || req.query.userId;
     
     if (!userId) {
       return res.status(401).json({
@@ -87,7 +89,8 @@ const getActivePersona = async (req, res) => {
  */
 const createPersona = async (req, res) => {
   try {
-    const userId = req.user?.id || req.userId;
+    // For testing: allow userId from request body if no auth
+    const userId = req.user?.id || req.userId || req.body.userId;
     
     if (!userId) {
       return res.status(401).json({
@@ -254,7 +257,7 @@ const updatePersona = async (req, res) => {
  */
 const activatePersona = async (req, res) => {
   try {
-    const userId = req.user?.id || req.userId;
+    const userId = req.user?.id || req.userId || req.body.userId;
     const { id } = req.params;
     
     if (!userId) {

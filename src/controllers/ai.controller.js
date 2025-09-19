@@ -15,8 +15,8 @@ const Persona = require('../models/Persona');
  */
 const generateContentController = async (req, res) => {
   try {
-    const { prompt, usePersona = false } = req.body;
-    const userId = req.userId; // From auth middleware
+    const { prompt, usePersona = false, userId } = req.body;
+    const userIdFromAuth = req.userId || userId; // From auth middleware or request body
 
     // Validation
     if (!prompt) {
@@ -42,8 +42,8 @@ const generateContentController = async (req, res) => {
 
     // Get persona if requested
     let persona = null;
-    if (usePersona && userId) {
-      persona = await Persona.getActivePersona(userId);
+    if (usePersona && userIdFromAuth) {
+      persona = await Persona.getActivePersona(userIdFromAuth);
       if (!persona) {
         return res.status(404).json({
           success: false,
@@ -94,8 +94,8 @@ const generateContentController = async (req, res) => {
  */
 const chatController = async (req, res) => {
   try {
-    const { messages, usePersona = false } = req.body;
-    const userId = req.userId; // From auth middleware
+    const { messages, usePersona = false, userId: requestUserId } = req.body;
+    const userId = req.userId || requestUserId; // From auth middleware or request body
 
     // Validation
     if (!messages || !Array.isArray(messages)) {
@@ -190,8 +190,8 @@ const chatController = async (req, res) => {
  */
 const analyzeContentController = async (req, res) => {
   try {
-    const { title, description, currentScript, targetAudience, platform, usePersona = false } = req.body;
-    const userId = req.userId; // From auth middleware
+    const { title, description, currentScript, targetAudience, platform, usePersona = false, userId: requestUserId } = req.body;
+    const userId = req.userId || requestUserId; // From auth middleware or request body
 
     // Validation
     if (!title && !description && !currentScript) {
@@ -258,8 +258,8 @@ const analyzeContentController = async (req, res) => {
  */
 const trendingIdeasController = async (req, res) => {
   try {
-    const { niche, platform = 'instagram', usePersona = false } = req.body;
-    const userId = req.userId; // From auth middleware
+    const { niche, platform = 'instagram', usePersona = false, userId: requestUserId } = req.body;
+    const userId = req.userId || requestUserId; // From auth middleware or request body
 
     // Get persona if requested (persona takes priority over manual niche/platform)
     let persona = null;

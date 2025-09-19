@@ -140,7 +140,7 @@ class SchedulesController {
       const { id } = req.params;
       const user_id = req.user.id;
 
-      const schedule = await Schedule.findOne({ _id: id, user_id });
+      const schedule = await Schedule.findOne({ _id: id, user_id }).populate('video_id');
       if (!schedule) {
         const error = new Error("Schedule not found");
         error.statusCode = 404;

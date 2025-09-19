@@ -140,6 +140,14 @@ const analyzeContent = async (contentData) => {
     {
       "analysis": "Analisis detail tentang kekuatan dan kelemahan konten saat ini dalam bahasa Indonesia",
       "improvements": ["5 saran perbaikan spesifik dalam bahasa Indonesia"],
+      "captionFix": {
+        "current": "Caption saat ini yang terdeteksi",
+        "suggested": "Caption yang disarankan untuk perbaikan"
+      },
+      "tagsFix": {
+        "current": ["tag1", "tag2", "tag3"],
+        "suggested": ["tag_baru1", "tag_baru2", "tag_baru3"]
+      },
       "hooks": ["3 alternatif hook yang lebih baik dalam bahasa Indonesia"],
       "engagement": ["3 tips optimisasi engagement dalam bahasa Indonesia"],
       "trending": ["3 cara untuk sejalan dengan trend terkini dalam bahasa Indonesia"],
@@ -328,16 +336,24 @@ const analyzeContentWithPersona = async (contentData, persona = null) => {
     
     systemPrompt += `
     
-    Always respond with a valid JSON object containing:
+    Selalu respond dengan JSON object yang valid berisi:
     {
-      "analysis": "Detailed analysis of current content strengths and weaknesses",
-      "improvements": ["5 specific improvement suggestions"],
-      "hooks": ["3 better hook alternatives"],
-      "engagement": ["3 engagement optimization tips"],
-      "trending": ["3 ways to align with current trends"],
-      "audience": "Refined target audience insights",
-      "competition": "Competitive analysis insights",
-      "nextSteps": ["3 actionable next steps"]
+      "analysis": "Analisis detail tentang kekuatan dan kelemahan konten saat ini dalam bahasa Indonesia",
+      "improvements": ["5 saran perbaikan spesifik dalam bahasa Indonesia"],
+      "captionFix": {
+        "current": "Caption saat ini yang terdeteksi",
+        "suggested": "Caption yang disarankan untuk perbaikan sesuai persona"
+      },
+      "tagsFix": {
+        "current": ["tag1", "tag2", "tag3"],
+        "suggested": ["tag_baru1", "tag_baru2", "tag_baru3"]
+      },
+      "hooks": ["3 alternatif hook yang lebih baik dalam bahasa Indonesia"],
+      "engagement": ["3 tips optimisasi engagement dalam bahasa Indonesia"],
+      "trending": ["3 cara untuk sejalan dengan trend terkini dalam bahasa Indonesia"],
+      "audience": "Insight target audience yang lebih tepat dalam bahasa Indonesia",
+      "competition": "Insight analisis kompetitor dalam bahasa Indonesia",
+      "nextSteps": ["3 langkah selanjutnya yang actionable dalam bahasa Indonesia"]
     }`;
 
     const userPrompt = `Analyze this content:

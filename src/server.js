@@ -26,6 +26,9 @@ app.use('/schedules', schedulesRoutes);
 const aiRoutes = require('./routes/ai.routes');
 app.use('/ai', aiRoutes);
 
+const personaRoutes = require('./routes/persona.routes');
+app.use('/personas', personaRoutes);
+
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);

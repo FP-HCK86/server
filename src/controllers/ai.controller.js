@@ -1,4 +1,13 @@
-const { generateContent, chatWithAI } = require('../services/ai.service');
+const { 
+  generateContent, 
+  chatWithAI, 
+  analyzeContent, 
+  generateTrendingIdeas,
+  chatWithPersona,
+  analyzeContentWithPersona,
+  generateTrendingIdeasWithPersona
+} = require('../services/ai.service');
+const Persona = require('../models/Persona');
 
 /**
  * Generate content from user prompt (Mode 1: Create content from scratch)
@@ -6,7 +15,8 @@ const { generateContent, chatWithAI } = require('../services/ai.service');
  */
 const generateContentController = async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, usePersona = false } = req.body;
+    const userId = req.userId; // From auth middleware
 
     // Validation
     if (!prompt) {
@@ -30,14 +40,41 @@ const generateContentController = async (req, res) => {
       });
     }
 
-    // Generate content using AI service
-    const result = await generateContent(prompt.trim());
+    // Get persona if requested
+    let persona = null;
+    if (usePersona && userId) {
+      persona = await Persona.getActivePersona(userId);
+      if (!persona) {
+        return res.status(404).json({
+          success: false,
+          message: 'No active persona found. Please create and activate a persona first.'
+        });
+      }
+    }
+
+        // Generate content using AI service (with persona if available)
+    const result = await generateContent(prompt, persona);
+
+    // Update persona usage if used
+    if (persona) {
+      await persona.incrementUsage();
+    }
 
     return res.status(200).json({
       success: true,
-      message: 'Content generated successfully',
-      data: result.data,
-      usage: result.usage
+      message: `Content generated successfully${persona ? ' with persona' : ''}`,
+      data: {
+        content: result.content,
+        prompt: prompt.trim(),
+        persona: persona ? {
+          name: persona.name,
+          niche: persona.contentNiche,
+          platform: persona.platformPriority,
+          brandVoice: persona.brandVoice
+        } : null,
+        usage: result.usage,
+        generatedAt: new Date().toISOString()
+      }
     });
 
   } catch (error) {
@@ -57,7 +94,8 @@ const generateContentController = async (req, res) => {
  */
 const chatController = async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, usePersona = false } = req.body;
+    const userId = req.userId; // From auth middleware
 
     // Validation
     if (!messages || !Array.isArray(messages)) {
@@ -98,14 +136,39 @@ const chatController = async (req, res) => {
       });
     }
 
-    // Chat with AI
-    const result = await chatWithAI(messages);
+    // Get persona if requested
+    let persona = null;
+    if (usePersona && userId) {
+      persona = await Persona.getActivePersona(userId);
+      if (!persona) {
+        return res.status(404).json({
+          success: false,
+          message: 'No active persona found. Please create and activate a persona first.'
+        });
+      }
+    }
+
+    // Chat with AI (with persona if available)
+    const result = persona 
+      ? await chatWithPersona(messages, persona)
+      : await chatWithAI(messages);
+
+    // Update persona usage if used
+    if (persona) {
+      await persona.incrementUsage();
+    }
 
     return res.status(200).json({
       success: true,
-      message: 'Chat response generated successfully',
+      message: `Chat response generated successfully${persona ? ' with persona' : ''}`,
       data: {
-        response: result.message,
+        response: result.response,
+        persona: persona ? {
+          name: persona.name,
+          niche: persona.contentNiche,
+          platform: persona.platformPriority,
+          brandVoice: persona.brandVoice
+        } : null,
         usage: result.usage
       }
     });
@@ -116,6 +179,132 @@ const chatController = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to process chat',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+/**
+ * Analyze existing content and provide improvement suggestions
+ * POST /ai/analyze-content
+ */
+const analyzeContentController = async (req, res) => {
+  try {
+    const { title, description, currentScript, targetAudience, platform, usePersona = false } = req.body;
+    const userId = req.userId; // From auth middleware
+
+    // Validation
+    if (!title && !description && !currentScript) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one of title, description, or currentScript is required'
+      });
+    }
+
+    // Get persona if requested
+    let persona = null;
+    if (usePersona && userId) {
+      persona = await Persona.getActivePersona(userId);
+      if (!persona) {
+        return res.status(404).json({
+          success: false,
+          message: 'No active persona found. Please create and activate a persona first.'
+        });
+      }
+    }
+
+    const contentData = { title, description, currentScript, targetAudience, platform };
+    
+    // Analyze content (with persona if available)
+    const result = persona 
+      ? await analyzeContentWithPersona(contentData, persona)
+      : await analyzeContent(contentData);
+
+    // Update persona usage if used
+    if (persona) {
+      await persona.incrementUsage();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Content analyzed successfully${persona ? ' with persona' : ''}`,
+      data: {
+        analysis: result.analysis,
+        persona: persona ? {
+          name: persona.name,
+          niche: persona.contentNiche,
+          platform: persona.platformPriority,
+          brandVoice: persona.brandVoice
+        } : null,
+        usage: result.usage,
+        analyzedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Analyze Content Error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to analyze content',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+/**
+ * Generate trending content ideas
+ * POST /ai/trending-ideas
+ */
+const trendingIdeasController = async (req, res) => {
+  try {
+    const { niche, platform = 'instagram', usePersona = false } = req.body;
+    const userId = req.userId; // From auth middleware
+
+    // Get persona if requested (persona takes priority over manual niche/platform)
+    let persona = null;
+    if (usePersona && userId) {
+      persona = await Persona.getActivePersona(userId);
+      if (!persona) {
+        return res.status(404).json({
+          success: false,
+          message: 'No active persona found. Please create and activate a persona first.'
+        });
+      }
+    }
+
+    // Generate trending ideas
+    const result = persona 
+      ? await generateTrendingIdeasWithPersona(persona)
+      : await generateTrendingIdeas(niche || 'general', platform);
+
+    // Update persona usage if used
+    if (persona) {
+      await persona.incrementUsage();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Trending ideas generated successfully${persona ? ' with persona' : ''}`,
+      data: {
+        trends: result.trends,
+        persona: persona ? {
+          name: persona.name,
+          niche: persona.contentNiche,
+          platform: persona.platformPriority,
+          brandVoice: persona.brandVoice
+        } : null,
+        usage: result.usage,
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Trending Ideas Error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate trending ideas',
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
@@ -156,5 +345,7 @@ const healthCheckController = async (req, res) => {
 module.exports = {
   generateContentController,
   chatController,
+  analyzeContentController,
+  trendingIdeasController,
   healthCheckController
 };

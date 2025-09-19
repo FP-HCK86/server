@@ -56,9 +56,26 @@ const listMyVideos = async (req, res) => {
 
     const videos = await Video.find({ user_id }).sort({ createdAt: -1 });
 
-    return res.json({ videos });
+    return res.json({ items: videos });
   } catch (err) {
     console.error('Error listMyVideos:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getVideo = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const { id } = req.params;
+
+    const video = await Video.findOne({ _id: id, user_id });
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    return res.json({ video });
+  } catch (err) {
+    console.error('Error getVideo:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -151,6 +168,7 @@ module.exports = {
   // export yang lama:
   uploadVideo,
   listMyVideos,
+  getVideo,
   // export baru:
   updateVideo,
   deleteVideo,

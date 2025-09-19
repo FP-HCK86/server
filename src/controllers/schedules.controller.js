@@ -1,112 +1,206 @@
-const Schedule = require('../models/Schedule');
-const VendorAccount = require('../models/VendorAccount');
+const Schedule = require("../models/Schedule");
+const VendorAccount = require("../models/VendorAccount");
 
-const createSchedule = async (req, res) => {
-  try {
-    const { video_id, platform, caption, hashtags, cover_time, scheduled_at } = req.body;
-    const user_id = req.user.id; // Assuming JWT payload has id
+class SchedulesController {
+  static async createSchedule(req, res, next) {
+    try {
+      const {
+        video_id,
+        platform,
+        caption,
+        hashtags,
+        cover_time,
+        scheduled_at,
+      } = req.body;
+      const user_id = req.user.id; // Assuming JWT payload has id
 
-    // Validate required fields
-    if (!video_id || !platform || !caption || !cover_time || !scheduled_at) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      // Validate required fields
+      if (!video_id || !platform || !caption || !cover_time || !scheduled_at) {
+        const error = new Error("Missing required fields");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Check if platform is valid
+      if (!["instagram", "tiktok"].includes(platform)) {
+        const error = new Error("Invalid platform");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Lookup vendor_profile_id
+      const vendorAccount = await VendorAccount.findOne({
+        user_id,
+        platform,
+        connected: true,
+      });
+      if (!vendorAccount) {
+        const error = new Error("Platform not connected");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // Create schedule
+      const schedule = new Schedule({
+        user_id,
+        video_id,
+        platform,
+        caption,
+        hashtags: hashtags || "",
+        cover_time,
+        scheduled_at: new Date(scheduled_at),
+        vendor_profile_id: vendorAccount.vendor_profile_id,
+        status: "pending",
+      });
+
+      await schedule.save();
+
+      res
+        .status(201)
+        .json({ message: "Schedule created successfully", schedule });
+    } catch (error) {
+      next(error);
     }
+  }
 
-    // Check if platform is valid
-    if (!['instagram', 'tiktok'].includes(platform)) {
-      return res.status(400).json({ error: 'Invalid platform' });
+  static async getSchedules(req, res, next) {
+    try {
+      const { day, month, week, backdate } = req.query;
+      const user_id = req.user.id;
+
+      // Build filter
+      const filter = { user_id };
+      const now = new Date();
+
+      if (backdate) {
+        // Filter backdate: scheduled_at < now
+        filter.scheduled_at = { $lt: now };
+      } else if (day) {
+        // Filter hari ini
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const endOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + 1
+        );
+        filter.scheduled_at = { $gte: startOfDay, $lt: endOfDay };
+      } else if (month) {
+        // Filter bulan ini
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        filter.scheduled_at = { $gte: startOfMonth, $lt: endOfMonth };
+      } else if (week) {
+        // Filter minggu ini (Senin - Minggu)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Senin
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        filter.scheduled_at = { $gte: startOfWeek, $lt: endOfWeek };
+      }
+
+      // Query schedules
+      const schedules = await Schedule.find(filter).sort({ scheduled_at: -1 });
+
+      res.status(200).json({ schedules });
+    } catch (error) {
+      next(error);
     }
+  }
 
-    // Lookup vendor_profile_id
-    const vendorAccount = await VendorAccount.findOne({ user_id, platform, connected: true });
-    if (!vendorAccount) {
-      return res.status(400).json({ error: 'Platform not connected' });
+  static async getScheduleById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+
+      const schedule = await Schedule.findOne({ _id: id, user_id });
+      if (!schedule) {
+        const error = new Error("Schedule not found");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      res.status(200).json({ schedule });
+    } catch (error) {
+      next(error);
     }
+  }
 
-    // Create schedule
-    const schedule = new Schedule({
-      user_id,
-      video_id,
-      platform,
-      caption,
-      hashtags: hashtags || '',
-      cover_time,
-      scheduled_at: new Date(scheduled_at),
-      vendor_profile_id: vendorAccount.vendor_profile_id,
-      status: 'pending'
-    });
+  static async updateSchedule(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+      const updates = req.body; // Expected fields: video_id, platform, caption, hashtags, cover_time, scheduled_at
 
-    await schedule.save();
+      // Find schedule that is still pending and belongs to user
+      const schedule = await Schedule.findOne({
+        _id: id,
+        user_id,
+        status: "pending",
+      });
+      if (!schedule) {
+        const error = new Error("Schedule not found or not pending");
+        error.statusCode = 404;
+        return next(error);
+      }
 
-    res.status(201).json({ message: 'Schedule created successfully', schedule });
-  } catch (error) {
-    console.error('Error creating schedule:', error);
-    res.status(500).json({ error: 'Internal server error' });
+      // Validate updates (similar to create, but only for changed fields)
+      if (
+        updates.platform &&
+        !["instagram", "tiktok"].includes(updates.platform)
+      ) {
+        const error = new Error("Invalid platform");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // If platform is updated, re-check vendor_account
+      if (updates.platform) {
+        const vendorAccount = await VendorAccount.findOne({
+          user_id,
+          platform: updates.platform,
+          connected: true,
+        });
+        if (!vendorAccount) {
+          const error = new Error("Platform not connected");
+          error.statusCode = 400;
+          return next(error);
+        }
+        schedule.vendor_profile_id = vendorAccount.vendor_profile_id; // Update if platform changed
+      }
+
+      // Apply updates (only allowed fields)
+      const allowedFields = [
+        "video_id",
+        "platform",
+        "caption",
+        "hashtags",
+        "cover_time",
+        "scheduled_at",
+      ];
+      allowedFields.forEach((field) => {
+        if (updates[field] !== undefined) {
+          if (field === "scheduled_at") {
+            schedule[field] = new Date(updates[field]);
+          } else {
+            schedule[field] = updates[field];
+          }
+        }
+      });
+
+      await schedule.save();
+
+      res
+        .status(200)
+        .json({ message: "Schedule updated successfully", schedule });
+    } catch (error) {
+      next(error);
+    }
   }
 }
 
-
-const getSchedules = async (req, res) => {
-  try {
-    const { day, month, week, backdate } = req.query;
-    const user_id = req.user.id;
-
-    // Build filter
-    const filter = { user_id };
-    const now = new Date();
-
-    if (backdate) {
-      // Filter backdate: scheduled_at < now
-      filter.scheduled_at = { $lt: now };
-    } else if (day) {
-      // Filter hari ini
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      filter.scheduled_at = { $gte: startOfDay, $lt: endOfDay };
-    } else if (month) {
-      // Filter bulan ini
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      filter.scheduled_at = { $gte: startOfMonth, $lt: endOfMonth };
-    } else if (week) {
-      // Filter minggu ini (Senin - Minggu)
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay() + 1);  // Senin
-      startOfWeek.setHours(0, 0, 0, 0);
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 7);
-      filter.scheduled_at = { $gte: startOfWeek, $lt: endOfWeek };
-    }
-
-    // Query schedules
-    const schedules = await Schedule.find(filter).sort({ scheduled_at: -1 });
-
-    res.status(200).json({ schedules });
-  } catch (error) {
-    console.error('Error fetching schedules:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-const getScheduleById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user_id = req.user.id;
-
-    const schedule = await Schedule.findOne({ _id: id, user_id });
-    if (!schedule) {
-      return res.status(404).json({ error: 'Schedule not found' });
-    }
-
-    res.status(200).json({ schedule });
-  } catch (error) {
-    console.error('Error fetching schedule by ID:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-
-module.exports = {
-  createSchedule,
-  getSchedules,
-  getScheduleById
-};
+module.exports = SchedulesController;

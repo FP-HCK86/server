@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-//const CronScheduler = require('./jobs/cron.scheduler')
+// const CronScheduler = require('./jobs/cron.scheduler')
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
@@ -22,7 +22,6 @@ app.use('/', authRoutes);
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Routes
-
 app.use('/', authRoutes);
 
 const schedulesRoutes = require('./routes/schedules.routes');
@@ -40,9 +39,8 @@ app.use('/videos', videosRouter);
 const accountLateRoutes = require('./routes/accountLate.routes');
 app.use('/accounts', accountLateRoutes);
 
-
 const vendorRoutes = require('./routes/vendor.routes');
-require('./jobs/cron.scheduler'); // load cron job
+require('./jobs/cron.scheduler');
 app.use('/vendor', vendorRoutes);
 
 
@@ -52,7 +50,7 @@ app.use(errorHandler);
 
 
 // Start cron after DB connect
-CronScheduler.start();
+// CronScheduler.start();
 
 // CHECK CONNECTION DATABASE
 connectDB();

@@ -44,10 +44,6 @@ app.use('/personas', personaRoutes);
 const connectSocialLateRoutes = require('./routes/connectSocialLate.routes');
 app.use('/connect', connectSocialLateRoutes);
 
-const accountLateRoutes = require('./routes/accountLate.routes');
-app.use('/accounts', accountLateRoutes);
-
-
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);

@@ -1,6 +1,6 @@
 // routes/connect.js
 const express = require('express');
-const { startConnect, connectCallback, getConnectionStatus } = require('../controllers/connectController');
+const { startConnect, connectCallback, getConnectionStatus } = require('../controllers/connectSocialLate.controller');
 
 const router = express.Router();
 

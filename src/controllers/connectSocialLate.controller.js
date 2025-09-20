@@ -2,7 +2,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const axiosClient = require('../config/axiosClient');
-const { upsertUserAccounts, getUserAccounts } = require('../services/accountStore');
+const { upsertUserAccounts, getUserAccounts } = require('../services/connectSocialLate.service');
 
 const { APP_BASE_URL = 'http://localhost:3000', CONNECT_CALLBACK_PATH = '/connect/callback' } = process.env;
 

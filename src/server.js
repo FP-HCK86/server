@@ -29,6 +29,14 @@ app.use('/ai', aiRoutes);
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
 
+const accountLateRoutes = require('./routes/accountLate.routes');
+app.use('/accounts', accountLateRoutes);
+
+
+const vendorRoutes = require('./routes/vendor.routes');
+require('./jobs/cron.scheduler'); // load cron job
+app.use('/vendor', vendorRoutes);
+
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);

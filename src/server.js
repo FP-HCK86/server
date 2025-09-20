@@ -33,6 +33,9 @@ app.use('/ai', aiRoutes);
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
 
+const personaRoutes = require('./routes/persona.routes');
+app.use('/personas', personaRoutes);
+
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);

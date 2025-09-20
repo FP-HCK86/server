@@ -3,6 +3,8 @@ const router = express.Router();
 const { 
   generateContentController, 
   chatController, 
+  analyzeContentController,
+  trendingIdeasController,
   healthCheckController 
 } = require('../controllers/ai.controller');
 const { aiRateLimit } = require('../middlewares/aiRateLimit');
@@ -31,5 +33,11 @@ router.post('/generate-content', aiRateLimitMiddleware, generateContentControlle
 
 // Chat with AI for brainstorming and refinement
 router.post('/chat', aiRateLimitMiddleware, chatController);
+
+// Analyze existing content and provide improvement suggestions (Mode 2: Analyze existing content)
+router.post('/analyze-content', aiRateLimitMiddleware, analyzeContentController);
+
+// Generate trending content ideas based on niche/persona
+router.post('/trending-ideas', aiRateLimitMiddleware, trendingIdeasController);
 
 module.exports = router;

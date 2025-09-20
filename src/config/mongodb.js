@@ -18,6 +18,8 @@ const connectDB = async () => {
             dbName: 'FP-HCK86'
         });
         console.log('MongoDB connected successfully');
+        console.log('Connected to database:', mongoose.connection.db.databaseName);
+        console.log('MongoDB URI:', env.mongodbUri);
     } catch (error) {
         console.error('MongoDB connection error:', error);
         // process.exit(1);

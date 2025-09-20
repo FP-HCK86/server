@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+
 const axiosClient = require('../config/axiosClient');
 
 // contoh dummy, harusnya tarik dari database
@@ -30,3 +31,31 @@ cron.schedule('* * * * *', async () => {
     }
   }
 });
+
+// Fungsi untuk mengirim email
+const sendEmail = (userEmail, subject, text) => {
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,  // Alamat email pengirim (misalnya Gmail)
+            pass: process.env.EMAIL_PASS,  // Password email pengirim
+        }
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: userEmail,
+        subject: subject,
+        text: text,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.log('Error:', error);
+        } else {
+            console.log('Email sent:', info.response);
+        }
+    });
+};
+
+module.exports = CronScheduler;

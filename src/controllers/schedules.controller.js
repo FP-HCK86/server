@@ -246,6 +246,47 @@ class SchedulesController {
       next(error);
     }
   }
+
+  // Tambahkan di class SchedulesController
+static async runNow(req, res, next) {
+    try {
+        const { id } = req.params;
+        const user_id = req.user.id;
+
+        // Find schedule pending milik user
+        const schedule = await Schedule.findOne({ _id: id, user_id, status: 'pending' });
+        if (!schedule) {
+            const error = new Error('Schedule not found or not pending');
+            error.statusCode = 404;
+            return next(error);
+        }
+
+        // Set processing (idempotent, jika sudah processing, skip)
+        if (schedule.status === 'processing') {
+            return res.status(200).json({ message: 'Already processing' });
+        }
+        await Schedule.findByIdAndUpdate(id, { status: 'processing', locked_at: new Date() });
+
+        // Panggil LateService.publishNow
+        const mediaUrl = 'https://res.cloudinary.com/...';  // Ganti dengan secure_url dari Video
+        const result = await LateService.publishNow({
+            vendor_profile_id: schedule.vendor_profile_id,
+            platform: schedule.platform,
+            mediaUrl,
+            caption: schedule.caption,
+            idempotencyKey: schedule._id.toString()
+        });
+
+        // Simpan vendor_job_id
+        if (result.vendor_job_id) {
+            await Schedule.findByIdAndUpdate(id, { vendor_job_id: result.vendor_job_id });
+        }
+
+        res.status(200).json({ message: 'Publish initiated', vendor_job_id: result.vendor_job_id });
+    } catch (error) {
+        next(error);
+    }
+}
 }
 
 module.exports = SchedulesController;

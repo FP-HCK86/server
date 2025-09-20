@@ -20,6 +20,9 @@ app.use('/', authRoutes);
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Routes
+
+app.use('/', authRoutes);
+
 const schedulesRoutes = require('./routes/schedules.routes');
 app.use('/schedules', schedulesRoutes);
 

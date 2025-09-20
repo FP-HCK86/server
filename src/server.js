@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-const CronScheduler = require('./jobs/cron.scheduler')
+// const CronScheduler = require('./jobs/cron.scheduler')
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
@@ -13,8 +13,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
-
 // USE ROUTES
+
 app.use('/auth', authRoutes);
 
 
@@ -22,7 +22,6 @@ app.use('/auth', authRoutes);
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Routes
-
 const schedulesRoutes = require('./routes/schedules.routes');
 app.use('/schedules', schedulesRoutes);
 
@@ -32,22 +31,23 @@ app.use('/ai', aiRoutes);
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
 
-
 const accountLateRoutes = require('./routes/accountLate.routes');
 app.use('/accounts', accountLateRoutes);
 
-
 const vendorRoutes = require('./routes/vendor.routes');
-require('./jobs/cron.scheduler'); // load cron job
+require('./jobs/cron.scheduler');
 app.use('/vendor', vendorRoutes);
 
 const personaRoutes = require('./routes/persona.routes');
 app.use('/personas', personaRoutes);
 
-// ERROR HANDLER
+const connectSocialLateRoutes = require('./routes/connectSocialLate.routes');
+app.use('/connect', connectSocialLateRoutes);
+
+const userRoutes = require('./routes/user.routes');
+app.use('/user', userRoutes);
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
-
 
 // Start cron after DB connect
 // CronScheduler.start();

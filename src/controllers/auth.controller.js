@@ -2,16 +2,18 @@ const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 const { signToken } = require("../middlewares/jwt");
 const env = require("../config/env");
+
 const cloudinary = require("../config/cloudinary");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+
 // used by nodemailer for posting schedule
-const nodemailer = require ('nodemailer')
+const nodemailer = require('nodemailer')
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: { 
-    user: env.EMAIL_USER,  
-    pass: env.EMAIL_PASS,  
+  auth: {
+    user: env.EMAIL_USER,
+    pass: env.EMAIL_PASS,
   }
 })
 
@@ -87,7 +89,7 @@ module.exports = {
         if (!credential) {
           throw { status: 400, message: "Missing Google credential" };
         }
-        
+
         // For PRODUCTION
         const client = new OAuth2Client(env.google.clientId);
         const ticket = await client.verifyIdToken({

@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-const CronScheduler = require('./jobs/cron.scheduler')
+//const CronScheduler = require('./jobs/cron.scheduler')
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
@@ -31,16 +31,11 @@ app.use('/schedules', schedulesRoutes);
 const aiRoutes = require('./routes/ai.routes');
 app.use('/ai', aiRoutes);
 
-<<<<<<< HEAD
 const personaRoutes = require('./routes/persona.routes');
 app.use('/personas', personaRoutes);
 
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
-=======
-const videosRouter = require('./routes/videos.routes');
-app.use('/videos', videosRouter);
-
 
 const accountLateRoutes = require('./routes/accountLate.routes');
 app.use('/accounts', accountLateRoutes);
@@ -50,9 +45,6 @@ const vendorRoutes = require('./routes/vendor.routes');
 require('./jobs/cron.scheduler'); // load cron job
 app.use('/vendor', vendorRoutes);
 
-const personaRoutes = require('./routes/persona.routes');
-app.use('/personas', personaRoutes);
->>>>>>> a780dce0eff56b5a9d9bf2f0b84d6ff2521cedbd
 
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');

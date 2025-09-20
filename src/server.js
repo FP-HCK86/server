@@ -22,6 +22,9 @@ app.use('/', authRoutes);
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Routes
+
+app.use('/', authRoutes);
+
 const schedulesRoutes = require('./routes/schedules.routes');
 app.use('/schedules', schedulesRoutes);
 
@@ -30,6 +33,18 @@ app.use('/ai', aiRoutes);
 
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
+
+
+const accountLateRoutes = require('./routes/accountLate.routes');
+app.use('/accounts', accountLateRoutes);
+
+
+const vendorRoutes = require('./routes/vendor.routes');
+require('./jobs/cron.scheduler'); // load cron job
+app.use('/vendor', vendorRoutes);
+
+const personaRoutes = require('./routes/persona.routes');
+app.use('/personas', personaRoutes);
 
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');

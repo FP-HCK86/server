@@ -1,51 +1,120 @@
-const env = require('../config/env')
-const { OAuth2Client } = require('google-auth-library');
-const User = require('../models/User');
-const { hashPassword, generateToken } = require('../helpers/auth');
+const { OAuth2Client } = require("google-auth-library");
+const User = require("../models/User");
+const { signToken } = require("../middlewares/jwt");
+const env = require("../config/env");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);  .env
+
+// used by nodemailer for posting schedule
 const nodemailer = require ('nodemailer')
-
-const client = new OAuth2Client(env.google.clientId);
-
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: env.email.user,  
-    pass: env.email.pass,  
+    user: env.EMAIL_USER,
+    pass: env.EMAIL_PASS,
   }
 })
 
-class AuthController {
-    static async googleLogin(req, res, next) {
 
-    const { id_token } = req.headers;
-
+module.exports = {
+  async register(req, res, next) {
     try {
-      const ticket = await client.verifyIdToken({
-        idToken: id_token,
-        audience: env.google.clientId,
+      const { username, email, password } = req.body;
+
+      const user = await User.create({
+        username,
+        email,
+        password,
       });
 
-      const payload = ticket.getPayload();
-      const { email, name, sub: userid } = payload;
+      res.status(201).json({
+        message: "User registered successfully",
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
 
-      let user = await User.findOne({ email });
-      if (!user) {
-        user = await User.create({
-          name,
-          email,
-          password: hashPassword(userid),
-        });
+  async login(req, res, next) {
+    try {
+      const { email, password } = req.body;
+
+      const user = await User.findOne({ email });
+      if (!user || !(await user.checkPassword(password))) {
+        throw { status: 401, message: "Invalid email/password" };
       }
 
-      const access_token = generateToken({ id: user.id, email: user.email });
+      const token = signToken({
+        id: user._id,
+        email: user.email,
+      });
 
-      res.status(200).json({ access_token });
-
-    } catch (error) {
-      console.error(error);
-      next(error);
+      res.json({
+        access_token: token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+        },
+      });
+    } catch (err) {
+      next(err);
     }
-  }
-}
+  },
 
-module.exports = AuthController;
+  async googleLogin(req, res, next) {
+    try {
+      // Handle both body and header methods for credential
+      let credential = req.body.credential || req.headers.id_token;
+      const testMode = req.body.testMode;
+
+      let payload;
+
+      if (testMode || credential === 'test_credential') {
+        // For testing purposes only - remove in production
+        payload = {
+          sub: "test_google_id_123", // userID
+          email: "smplanner86@gmail.com",
+          name: "b86 hackt", // This will be mapped to username
+          picture: "https://example.com/avatar.jpg",
+        };
+      } else {
+        if (!credential) {
+          throw { status: 400, message: "Missing Google credential" };
+        }
+        
+        // For PRODUCTION
+        const client = new OAuth2Client(env.google.clientId);
+        const ticket = await client.verifyIdToken({
+          idToken: credential, // Ensure credential is the id_token from OAuth response
+          audience: env.google.clientId,
+        });
+        payload = ticket.getPayload();
+      }
+
+      // Use the static method to find or create user
+      const user = await User.findOrCreateFromGoogle(payload);
+
+      const token = signToken({
+        id: user._id,
+        email: user.email,
+      });
+
+      res.json({
+        access_token: token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+};

@@ -1,17 +1,23 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 
-const auth = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];  // Bearer <token>
-    if (!token) return res.status(401).json({ error: 'No token provided' });
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    try {
-        const decoded = jwt.verify(token, env.jwt.secret);
-        req.user = decoded;  // { id, email }
-        next();
-    } catch (error) {
-        res.status(401).json({ error: 'Invalid token' });
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, env.jwtSecret, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
     }
+
+    req.user = user;
+    next();
+  });
 };
 
-module.exports = auth;
+module.exports = { authenticateToken };
+

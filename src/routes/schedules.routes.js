@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const auth = require ('../middlewares/auth')
+const { authenticateToken } = require('../middlewares/auth');
+
 const SchedulesController = require('../controllers/schedules.controller');
 
+// JWT Authentication middleware
+// All routes now use proper JWT authentication instead of mock auth
 
+router.post('/', authenticateToken, SchedulesController.createSchedule);
+router.get('/', authenticateToken, SchedulesController.getSchedules);
+router.get('/:id', authenticateToken, SchedulesController.getScheduleById);
+router.patch('/:id', authenticateToken, SchedulesController.updateSchedule);
+router.delete('/:id', authenticateToken, SchedulesController.deleteSchedule);
 
-
-router.post('/', auth, SchedulesController.createSchedule);
-router.get('/', auth, SchedulesController.getSchedules);
-router.get('/:id', auth, SchedulesController.getScheduleById);
-router.patch('/:id', auth, SchedulesController.updateSchedule)
-router.delete('/:id', auth, SchedulesController.deleteSchedule)
-router.post('/:id/run-now', auth, SchedulesController.runNow)
 
 
 

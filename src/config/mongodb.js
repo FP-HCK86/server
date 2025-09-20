@@ -12,11 +12,11 @@ const client = new MongoClient(uri, {
     },
 });
 
-const database = client.db("FP-HCK86");
-
 const connectDB = async () => {
     try {
-        await mongoose.connect(env.mongodbUri);
+        await mongoose.connect(env.mongodbUri, {
+            dbName: 'FP-HCK86'
+        });
         console.log('MongoDB connected successfully');
     } catch (error) {
         console.error('MongoDB connection error:', error);
@@ -25,6 +25,5 @@ const connectDB = async () => {
 };
 
 module.exports = {
-    database,
     connectDB
 }

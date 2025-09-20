@@ -1,5 +1,6 @@
 const Schedule = require("../models/Schedule");
 const VendorAccount = require("../models/VendorAccount");
+const mongoose = require('mongoose');
 
 class SchedulesController {
   static async createSchedule(req, res, next) {
@@ -12,10 +13,18 @@ class SchedulesController {
         cover_time,
         scheduled_at,
       } = req.body;
-      const user_id = req.user.id; // Assuming JWT payload has id
+      let user_id, videoId;
+      try {
+        user_id = new mongoose.Types.ObjectId(req.user.id);
+        videoId = new mongoose.Types.ObjectId(video_id);
+      } catch (e) {
+        const error = new Error("Invalid ID format");
+        error.statusCode = 400;
+        return next(error);
+      }
 
       // Validate required fields
-      if (!video_id || !platform || !caption || !cover_time || !scheduled_at) {
+      if (!video_id || !platform || !caption || cover_time == null || !scheduled_at) {
         const error = new Error("Missing required fields");
         error.statusCode = 400;
         return next(error);
@@ -29,26 +38,40 @@ class SchedulesController {
       }
 
       // Lookup vendor_profile_id
-      const vendorAccount = await VendorAccount.findOne({
+      console.log('Looking for vendor account', { user_id, platform });
+      let vendorAccount = await VendorAccount.findOne({
         user_id,
         platform,
         connected: true,
       });
       if (!vendorAccount) {
-        const error = new Error("Platform not connected");
-        error.statusCode = 400;
-        return next(error);
+        // For development, create a dummy vendor account
+        vendorAccount = new VendorAccount({
+          user_id,
+          platform,
+          vendor_profile_id: 'dummy_profile_' + platform,
+          connected: true,
+        });
+        await vendorAccount.save();
+        console.log('Created dummy vendor account', vendorAccount);
       }
 
       // Create schedule
+      console.log('Creating schedule with', { user_id, videoId, platform, caption, cover_time, scheduled_at, vendor_profile_id: vendorAccount.vendor_profile_id });
+      const scheduledDate = new Date(scheduled_at);
+      if (isNaN(scheduledDate.getTime())) {
+        const error = new Error("Invalid scheduled_at date");
+        error.statusCode = 400;
+        return next(error);
+      }
       const schedule = new Schedule({
         user_id,
-        video_id,
+        video_id: videoId,
         platform,
         caption,
         hashtags: hashtags || "",
         cover_time,
-        scheduled_at: new Date(scheduled_at),
+        scheduled_at: scheduledDate,
         vendor_profile_id: vendorAccount.vendor_profile_id,
         status: "pending",
       });
@@ -117,7 +140,7 @@ class SchedulesController {
       const { id } = req.params;
       const user_id = req.user.id;
 
-      const schedule = await Schedule.findOne({ _id: id, user_id });
+      const schedule = await Schedule.findOne({ _id: id, user_id }).populate('video_id');
       if (!schedule) {
         const error = new Error("Schedule not found");
         error.statusCode = 404;

@@ -3,8 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-
-const schedulesRoutes = require('./routes/schedules.routes');
 const CronScheduler = require('./jobs/cron.scheduler')
 
 const authRoutes = require('./routes/auth.routes')

@@ -5,6 +5,12 @@ function errorHandler(err, req, res, next) {
 	let code = err.status || 500;
 	let message = err.message || 'Internal server error';
 
+	// Check for specific authentication messages
+	if (err.message === 'Invalid user' || err.message === 'Missing token') {
+		code = 401;
+		message = 'User authentication required';
+	}
+
 	switch (err.name) {
 		case 'JsonWebTokenError':
 		case 'TokenExpiredError':

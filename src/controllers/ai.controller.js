@@ -94,11 +94,17 @@ const generateContentController = async (req, res) => {
  */
 const chatController = async (req, res) => {
   try {
+    console.log('[Chat Controller] Request received:', {
+      body: req.body,
+      headers: req.headers['content-type']
+    });
+    
     const { messages, usePersona = false, userId: requestUserId } = req.body;
     const userId = req.userId || requestUserId; // From auth middleware or request body
 
     // Validation
     if (!messages || !Array.isArray(messages)) {
+      console.log('[Chat Controller] Validation failed: messages not array');
       return res.status(400).json({
         success: false,
         message: 'Messages array is required'
@@ -118,13 +124,13 @@ const chatController = async (req, res) => {
       typeof msg === 'object' && 
       typeof msg.role === 'string' && 
       typeof msg.content === 'string' &&
-      ['user', 'assistant'].includes(msg.role)
+      ['user', 'assistant', 'system'].includes(msg.role)
     );
 
     if (!isValidMessages) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid message format. Each message must have role (user/assistant) and content (string)'
+        message: 'Invalid message format. Each message must have role (user/assistant/system) and content (string)'
       });
     }
 
@@ -149,16 +155,22 @@ const chatController = async (req, res) => {
     }
 
     // Chat with AI (with persona if available)
+    console.log('[Chat Controller] Calling AI service with messages:', messages.length);
     const result = persona 
       ? await chatWithPersona(messages, persona)
       : await chatWithAI(messages);
+
+    console.log('[Chat Controller] AI service response received:', {
+      responseLength: result.response?.length,
+      usage: result.usage
+    });
 
     // Update persona usage if used
     if (persona) {
       await persona.incrementUsage();
     }
 
-    return res.status(200).json({
+    const responseData = {
       success: true,
       message: `Chat response generated successfully${persona ? ' with persona' : ''}`,
       data: {
@@ -171,10 +183,21 @@ const chatController = async (req, res) => {
         } : null,
         usage: result.usage
       }
+    };
+
+    console.log('[Chat Controller] Sending response:', {
+      success: responseData.success,
+      dataKeys: Object.keys(responseData.data)
     });
 
+    return res.status(200).json(responseData);
+
   } catch (error) {
-    console.error('Chat Controller Error:', error);
+    console.error('[Chat Controller] Error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     
     return res.status(500).json({
       success: false,

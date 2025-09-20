@@ -13,10 +13,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
-
 // USE ROUTES
 app.use('/', authRoutes);
-
 
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
@@ -43,10 +41,16 @@ app.use('/vendor', vendorRoutes);
 const personaRoutes = require('./routes/persona.routes');
 app.use('/personas', personaRoutes);
 
+const connectSocialLateRoutes = require('./routes/connectSocialLate.routes');
+app.use('/connect', connectSocialLateRoutes);
+
+const accountLateRoutes = require('./routes/accountLate.routes');
+app.use('/accounts', accountLateRoutes);
+
+
 // ERROR HANDLER
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
-
 
 // Start cron after DB connect
 // CronScheduler.start();

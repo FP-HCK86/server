@@ -1,4 +1,5 @@
 const { openai } = require('../config/openai');
+const seedreamsService = require('./seedreams.service');
 
 /**
  * Generate persona-aware comprehensive video content from user prompt
@@ -30,8 +31,14 @@ const generateContent = async (prompt, persona = null) => {
     
     Selalu respond dengan JSON object yang valid berisi SEMUA field berikut:
     {
-      "script": "Skrip video detail dengan alur cerita yang jelas dalam bahasa Indonesia",
-      "storyboard": "Breakdown scene-by-scene dengan deskripsi visual dalam bahasa Indonesia",
+      "script": "Skrip video SANGAT DETAIL dengan dialog, narasi, dan instruksi akting yang lengkap. Format: [SCENE] Deskripsi setting. [DIALOG] 'Kata-kata yang diucapkan'. [ACTION] Deskripsi gerakan/aksi. Minimal 200 kata untuk script yang komprehensif.",
+      "storyboard": [
+        {
+          "timestamp": "00:00-00:05",
+          "illustration": "Deskripsi detail scene visual/ilustrasi adegan",
+          "description": "Penjelasan aksi, dialog, atau elemen penting dalam scene"
+        }
+      ],
       "hooks": ["3 hook menarik untuk menarik perhatian dalam bahasa Indonesia"],
       "tags": ["10 hashtag relevan tanpa simbol # dalam bahasa Indonesia/Inggris"],
       "caption": "Caption media sosial yang engaging dengan emoji dalam bahasa Indonesia",
@@ -45,6 +52,23 @@ const generateContent = async (prompt, persona = null) => {
       "locations": ["Saran lokasi syuting dalam bahasa Indonesia"],
       "musicSuggestion": "Jenis musik latar yang direkomendasikan dalam bahasa Indonesia"
     }
+    
+    CRITICAL - STORYBOARD ILLUSTRATION REQUIREMENTS:
+    - Buat minimal 4-6 scene dalam array storyboard
+    - Setiap timestamp harus realistis sesuai durasi total video
+    - ILLUSTRATION field HARUS berisi PROMPT untuk AI image generation dalam bahasa Inggris yang sangat detail dan spesifik
+    - Format illustration: "A [detailed scene description], [camera angle], [lighting setup], [mood/atmosphere], [visual style], high quality, cinematic lighting"
+    - Contoh illustration: "A young Indonesian person sitting in a bank queue looking extremely bored, medium shot from side angle, bright indoor fluorescent lighting, mundane everyday atmosphere, realistic social media content style, high quality, cinematic lighting"
+    - DESCRIPTION field berisi penjelasan aksi/dialog dalam bahasa Indonesia untuk panduan creator
+    - Pastikan illustration prompt dapat menghasilkan gambar yang realistis, sesuai budaya Indonesia, dan cocok untuk video content
+    
+    PENTING UNTUK SCRIPT:
+    - Buat script DETAIL minimal 200-300 kata
+    - Sertakan dialog lengkap yang akan diucapkan
+    - Berikan instruksi akting dan gesture
+    - Format dengan [OPENING] [DIALOG] [ACTION] [CLOSING]
+    - Include hook pembuka, isi yang engaging, dan call-to-action
+    - Sesuaikan dengan durasi video yang diminta
     
     Buat konten yang engaging, actionable, dan dioptimalkan untuk tingkat engagement tinggi. Gunakan bahasa Indonesia yang natural dan sesuai dengan budaya Indonesia.`;
 
@@ -61,8 +85,37 @@ const generateContent = async (prompt, persona = null) => {
 
     const content = JSON.parse(completion.choices[0].message.content);
     
+    // Generate visual illustrations for storyboard using Seedreams
+    // OpenAI sudah menghasilkan prompt yang optimal, langsung gunakan untuk Seedreams
+    let enhancedContent = { ...content };
+    
+    try {
+      if (content.storyboard && Array.isArray(content.storyboard)) {
+        console.log('Generating visual storyboard with Seedreams...');
+        
+        // Use OpenAI illustration prompts directly without modification
+        const visualStoryboard = await seedreamsService.generateStoryboardIllustrations(
+          content.storyboard, 
+          { 
+            useDirectPrompts: true, // Flag to use OpenAI prompts directly
+            contentNiche: persona?.contentNiche || 'general'
+          }
+        );
+        
+        enhancedContent.storyboard = visualStoryboard;
+        enhancedContent.hasVisualStoryboard = true;
+        
+        console.log(`Generated ${visualStoryboard.length} visual illustrations from OpenAI prompts`);
+      }
+    } catch (error) {
+      console.error('Seedreams integration error:', error);
+      // Keep original text-based storyboard as fallback
+      enhancedContent.hasVisualStoryboard = false;
+      enhancedContent.visualError = 'Image generation unavailable, using text descriptions';
+    }
+    
     return {
-      content,
+      content: enhancedContent,
       usage: {
         promptTokens: completion.usage.prompt_tokens,
         completionTokens: completion.usage.completion_tokens,

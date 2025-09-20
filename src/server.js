@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }))
 // USE ROUTES
 
 app.use('/auth', authRoutes);
-
+app.use('/', authRoutes)
 
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));

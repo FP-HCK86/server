@@ -89,10 +89,18 @@ const getActivePersona = async (req, res) => {
  */
 const createPersona = async (req, res) => {
   try {
-    // For testing: allow userId from request body if no auth
-    const userId = req.user?.id || req.userId || req.body.userId;
+    console.log('[Create Persona] Request received:', {
+      body: req.body,
+      headers: req.headers['content-type']
+    });
+    
+    // Get userId from authenticated user
+    const userId = req.user?.id;
+    
+    console.log('[Create Persona] User ID:', userId);
     
     if (!userId) {
+      console.log('[Create Persona] No user ID found');
       return res.status(401).json({
         success: false,
         message: 'User authentication required'
@@ -157,8 +165,12 @@ const createPersona = async (req, res) => {
       isActive
     };
 
+    console.log('[Create Persona] Creating persona with data:', personaData);
+    
     const persona = new Persona(personaData);
     await persona.save();
+
+    console.log('[Create Persona] Persona created successfully:', persona._id);
 
     return res.status(201).json({
       success: true,
@@ -257,7 +269,7 @@ const updatePersona = async (req, res) => {
  */
 const activatePersona = async (req, res) => {
   try {
-    const userId = req.user?.id || req.userId || req.body.userId;
+    const userId = req.user?.id;
     const { id } = req.params;
     
     if (!userId) {
@@ -470,6 +482,48 @@ const getPersonaWizard = async (req, res) => {
   }
 };
 
+/**
+ * Deactivate all personas for a user
+ * PUT /api/persona/deactivate-all
+ */
+const deactivateAllPersonas = async (req, res) => {
+  try {
+    // Get userId from authenticated user
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    // Deactivate all personas for the user
+    const result = await Persona.updateMany(
+      { userId: userId },
+      { isActive: false, lastUsedAt: new Date() }
+    );
+
+    console.log(`[Deactivate All] Deactivated ${result.modifiedCount} personas for user ${userId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'All personas deactivated successfully',
+      data: {
+        deactivatedCount: result.modifiedCount
+      }
+    });
+
+  } catch (error) {
+    console.error('Deactivate All Personas Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to deactivate personas',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   getUserPersonas,
   getActivePersona,
@@ -477,5 +531,6 @@ module.exports = {
   updatePersona,
   activatePersona,
   deletePersona,
-  getPersonaWizard
+  getPersonaWizard,
+  deactivateAllPersonas
 };

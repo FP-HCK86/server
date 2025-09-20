@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const authMiddleware = require('../middlewares/authentication');
 const {
   getUserPersonas,
   getActivePersona,
@@ -7,7 +8,8 @@ const {
   updatePersona,
   activatePersona,
   deletePersona,
-  getPersonaWizard
+  getPersonaWizard,
+  deactivateAllPersonas
 } = require('../controllers/persona.controller');
 
 // Middleware for request logging (optional)
@@ -19,8 +21,8 @@ const requestLogger = (req, res, next) => {
 // Apply logging middleware
 router.use(requestLogger);
 
-// Note: Add authentication middleware here when available
-// router.use(authMiddleware);
+// Apply authentication middleware
+router.use(authMiddleware);
 
 /**
  * Persona Management Routes
@@ -37,6 +39,9 @@ router.get('/active', getActivePersona);
 
 // Create new persona
 router.post('/', createPersona);
+
+// Deactivate all personas for user (must be before /:id routes)
+router.put('/deactivate-all', deactivateAllPersonas);
 
 // Update existing persona
 router.put('/:id', updatePersona);

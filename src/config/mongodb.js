@@ -15,7 +15,7 @@ const client = new MongoClient(uri, {
 const connectDB = async () => {
     try {
         await mongoose.connect(env.mongodbUri, {
-            dbName: 'FP-HCK86'
+            dbName: 'test'
         });
         console.log('MongoDB connected successfully');
         console.log('Connected to database:', mongoose.connection.db.databaseName);

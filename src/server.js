@@ -14,7 +14,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
 // USE ROUTES
-app.use('/', authRoutes);
+// app.use('/', authRoutes); // Commented out duplicate
 
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
@@ -44,7 +44,8 @@ app.use('/personas', personaRoutes);
 const connectSocialLateRoutes = require('./routes/connectSocialLate.routes');
 app.use('/connect', connectSocialLateRoutes);
 
-// ERROR HANDLER
+const userRoutes = require('./routes/user.routes');
+app.use('/user', userRoutes);
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
 

@@ -2,7 +2,8 @@ const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 const { signToken } = require("../middlewares/jwt");
 const env = require("../config/env");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);  .env
+const cloudinary = require("../config/cloudinary");
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // used by nodemailer for posting schedule
 const nodemailer = require ('nodemailer')
@@ -106,6 +107,66 @@ module.exports = {
 
       res.json({
         access_token: token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getProfile(req, res, next) {
+    try {
+      const user = await User.findById(req.user.id).select('-password');
+      if (!user) {
+        throw { status: 404, message: "User not found" };
+      }
+
+      res.json({
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+          googleId: user.googleId,
+          createdAt: user.createdAt,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async uploadAvatar(req, res, next) {
+    try {
+      if (!req.file) {
+        throw { status: 400, message: "No file uploaded" };
+      }
+
+      // Upload to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "avatars",
+        public_id: `user_${req.user.id}_${Date.now()}`,
+        transformation: [
+          { width: 200, height: 200, crop: "fill", gravity: "face" },
+          { quality: "auto" },
+          { format: "auto" }
+        ]
+      });
+
+      // Update user avatar in database
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { avatar: result.secure_url },
+        { new: true }
+      ).select('-password');
+
+      res.json({
+        message: "Avatar uploaded successfully",
         user: {
           id: user._id,
           username: user.username,

@@ -14,14 +14,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
 // USE ROUTES
-// app.use('/', authRoutes); // Commented out duplicate
+
+app.use('/auth', authRoutes);
+
 
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // Routes
-app.use('/', authRoutes);
-
 const schedulesRoutes = require('./routes/schedules.routes');
 app.use('/schedules', schedulesRoutes);
 

@@ -4,6 +4,119 @@ const mongoose = require("mongoose");
 const { sendEmail } = require("../helpers/email");
 
 class SchedulesController {
+
+  static async createSchedule(req, res, next) {
+  try {
+    const {
+      video_id,
+      platform,
+      caption,
+      hashtags,
+      cover_time,
+      scheduled_at,
+    } = req.body;
+    let user_id, videoId;
+    try {
+      user_id = new mongoose.Types.ObjectId(req.user.id);
+      videoId = new mongoose.Types.ObjectId(video_id);
+    } catch (e) {
+      const error = new Error("Invalid ID format");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Validate required fields
+    if (
+      !video_id ||
+      !platform ||
+      !caption ||
+      cover_time == null ||
+      !scheduled_at
+    ) {
+      const error = new Error("Missing required fields");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Check if platform is valid
+    if (!["instagram", "tiktok"].includes(platform)) {
+      const error = new Error("Invalid platform");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Lookup vendor_profile_id
+    console.log("Looking for vendor account", { user_id, platform });
+    let vendorAccount = await VendorAccount.findOne({
+      user_id,
+      platform,
+      connected: true,
+    });
+    if (!vendorAccount) {
+      // For development, create a dummy vendor account
+      vendorAccount = new VendorAccount({
+        user_id,
+        platform,
+        vendor_profile_id: "dummy_profile_" + platform,
+        connected: true,
+      });
+      await vendorAccount.save();
+      console.log("Created dummy vendor account", vendorAccount);
+    }
+
+    // Create schedule
+    console.log("Creating schedule with", {
+      user_id,
+      videoId,
+      platform,
+      caption,
+      cover_time,
+      scheduled_at,
+      vendor_profile_id: vendorAccount.vendor_profile_id,
+    });
+
+    // Konversi scheduled_at dari WIB ke UTC
+    const scheduledAtWIB = new Date(scheduled_at); // Input WIB
+    if (isNaN(scheduledAtWIB.getTime())) {
+      const error = new Error("Invalid scheduled_at date");
+      error.statusCode = 400;
+      return next(error);
+    }
+    const offset = 7 * 60 * 60 * 1000; // UTC+7 offset in ms
+    const scheduledDate = new Date(scheduledAtWIB.getTime() - offset); // Simpan sebagai UTC
+
+    const schedule = new Schedule({
+      user_id,
+      video_id: videoId,
+      platform,
+      caption,
+      hashtags: hashtags || "",
+      cover_time,
+      scheduled_at: scheduledDate, // Simpan sebagai UTC
+      vendor_profile_id: vendorAccount.vendor_profile_id,
+      status: "pending",
+    });
+
+    await schedule.save();
+
+    // Kirim email konfirmasi ke user (ubah dari 30 menit ke 5 menit)
+    try {
+      await sendEmail(
+        req.user.email,
+        "Schedule Posting Dibuat - SMP Planner",
+        `Halo, Schedule posting ke ${platform} berhasil dibuat untuk ${scheduled_at}. Kami akan kirim reminder 5 menit sebelum waktu posting.`
+      );
+    } catch (emailError) {
+      console.error("Error sending confirmation email:", emailError);
+    }
+
+    res
+      .status(201)
+      .json({ message: "Schedule created successfully", schedule });
+  } catch (error) {
+    next(error);
+  }
+}
   
 
   static async getSchedules(req, res, next) {

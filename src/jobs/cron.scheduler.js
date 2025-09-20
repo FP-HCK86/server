@@ -58,4 +58,4 @@ const sendEmail = (userEmail, subject, text) => {
     });
 };
 
-module.exports = CronScheduler;
+// module.exports = CronScheduler;

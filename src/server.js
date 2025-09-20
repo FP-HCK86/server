@@ -28,6 +28,9 @@ app.use('/schedules', schedulesRoutes);
 const aiRoutes = require('./routes/ai.routes');
 app.use('/ai', aiRoutes);
 
+const personaRoutes = require('./routes/persona.routes');
+app.use('/personas', personaRoutes);
+
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
 
@@ -38,8 +41,6 @@ const vendorRoutes = require('./routes/vendor.routes');
 require('./jobs/cron.scheduler');
 app.use('/vendor', vendorRoutes);
 
-const personaRoutes = require('./routes/persona.routes');
-app.use('/personas', personaRoutes);
 
 const connectSocialLateRoutes = require('./routes/connectSocialLate.routes');
 app.use('/connect', connectSocialLateRoutes);

@@ -8,9 +8,9 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);  .env
 const nodemailer = require ('nodemailer')
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: {
-    user: env.EMAIL_USER,
-    pass: env.EMAIL_PASS,
+  auth: { 
+    user: env.EMAIL_USER,  
+    pass: env.EMAIL_PASS,  
   }
 })
 

@@ -2,7 +2,18 @@ const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 const { signToken } = require("../middlewares/jwt");
 const env = require("../config/env");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // Ensure this is set in .env
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);  .env
+
+// used by nodemailer for posting schedule
+const nodemailer = require ('nodemailer')
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: env.EMAIL_USER,
+    pass: env.EMAIL_PASS,
+  }
+})
+
 
 module.exports = {
   async register(req, res, next) {

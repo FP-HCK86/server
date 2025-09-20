@@ -2,8 +2,17 @@ const env = require('../config/env')
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const { hashPassword, generateToken } = require('../helpers/auth');
+const nodemailer = require ('nodemailer')
 
 const client = new OAuth2Client(env.google.clientId);
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: env.email.user,  
+    pass: env.email.pass,  
+  }
+})
 
 class AuthController {
     static async googleLogin(req, res, next) {
@@ -29,6 +38,7 @@ class AuthController {
       }
 
       const access_token = generateToken({ id: user.id, email: user.email });
+
       res.status(200).json({ access_token });
 
     } catch (error) {
@@ -36,9 +46,6 @@ class AuthController {
       next(error);
     }
   }
-
 }
-
-
 
 module.exports = AuthController;

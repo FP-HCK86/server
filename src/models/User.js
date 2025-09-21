@@ -24,7 +24,6 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
-
   // Used for Social Media Integration Platform
   profileId: {
     type: String,

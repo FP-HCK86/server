@@ -180,42 +180,4 @@ module.exports = {
       next(err);
     }
   },
-
-  async updateProfile(req, res, next) {
-    try {
-      const { username } = req.body;
-
-      // Validate username
-      if (!username || username.trim().length === 0) {
-        throw { status: 400, message: "Username is required" };
-      }
-
-      if (username.trim().length < 2) {
-        throw { status: 400, message: "Username must be at least 2 characters" };
-      }
-
-      // Update user in database
-      const user = await User.findByIdAndUpdate(
-        req.user.id,
-        { username: username.trim() },
-        { new: true, runValidators: true }
-      ).select('-password');
-
-      if (!user) {
-        throw { status: 404, message: "User not found" };
-      }
-
-      res.json({
-        message: "Profile updated successfully",
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          avatar: user.avatar,
-        },
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
 };

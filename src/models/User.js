@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
+  isPremium: {  
+    type: Boolean,
+    default: false,  // Default false, set true setelah pembayaran berhasil
+  },
 }, {
   timestamps: true,
 });

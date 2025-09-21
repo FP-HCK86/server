@@ -24,6 +24,11 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
+  // Used for Social Media Integration Platform
+  profileId: {
+    type: String,
+    sparse: true, // Late API profile ID for social media connections
+  },
 }, {
   timestamps: true,
 });

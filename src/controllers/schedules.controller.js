@@ -1,0 +1,430 @@
+const Schedule = require("../models/Schedule");
+const VendorAccount = require("../models/VendorAccount");
+const mongoose = require("mongoose");
+const { sendEmail } = require("../helpers/email");
+const LateService = require("../services/lateService");
+
+class SchedulesController {
+
+  static async createSchedule(req, res, next) {
+  try {
+    const {
+      video_id,
+      platform,
+      caption,
+      hashtags,
+      cover_time,
+      scheduled_at,
+    } = req.body;
+    let user_id, videoId;
+    try {
+      user_id = new mongoose.Types.ObjectId(req.user.id);
+      videoId = new mongoose.Types.ObjectId(video_id);
+    } catch (e) {
+      const error = new Error("Invalid ID format");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Validate required fields
+    if (
+      !video_id ||
+      !platform ||
+      !caption ||
+      cover_time == null ||
+      !scheduled_at
+    ) {
+      const error = new Error("Missing required fields");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Check if platform is valid
+    if (!["instagram", "tiktok"].includes(platform)) {
+      const error = new Error("Invalid platform");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    // Lookup vendor_profile_id
+    console.log("Looking for vendor account", { user_id, platform });
+    let vendorAccount = await VendorAccount.findOne({
+      user_id,
+      platform,
+      connected: true,
+    });
+    
+    if (!vendorAccount) {
+      return res.status(400).json({
+        success: false,
+        message: `No connected ${platform} account found. Please connect your ${platform} account first.`,
+        error: "ACCOUNT_NOT_CONNECTED"
+      });
+    }
+
+    // Create schedule
+    console.log("Creating schedule with", {
+      user_id,
+      videoId,
+      platform,
+      caption,
+      cover_time,
+      scheduled_at,
+      vendor_profile_id: vendorAccount.vendor_profile_id,
+    });
+
+    // FE already sends scheduled_at as an ISO string in UTC (it builds local +07:00 then .toISOString())
+    // Previously we subtracted 7h again, resulting in past times and immediate publish.
+    // Now: trust incoming timestamp and just parse it.
+    const scheduledAtUTC = new Date(scheduled_at);
+    if (isNaN(scheduledAtUTC.getTime())) {
+      const error = new Error("Invalid scheduled_at date");
+      error.statusCode = 400;
+      return next(error);
+    }
+    // Must be at least 60s in the future to allow Late to schedule properly
+    if (scheduledAtUTC.getTime() < Date.now() + 60 * 1000) {
+      const error = new Error("Waktu schedule harus minimal 1 menit di depan waktu sekarang");
+      error.statusCode = 400;
+      return next(error);
+    }
+    const scheduledDate = scheduledAtUTC; // already UTC
+    console.log('[ScheduleCreate] scheduled_at(raw)=', scheduled_at, 'storedUTC=', scheduledDate.toISOString());
+
+    const schedule = new Schedule({
+      user_id,
+      video_id: videoId,
+      platform,
+      caption,
+      hashtags: hashtags || "",
+      cover_time,
+  scheduled_at: scheduledDate, // already UTC
+      vendor_profile_id: vendorAccount.vendor_profile_id,
+      status: "pending",
+    });
+
+    // Ambil video secure_url (butuh populate atau query manual)
+    const Video = require('../models/Video');
+    const videoDoc = await Video.findOne({ _id: videoId, user_id });
+    let mediaItems = [];
+    if (videoDoc?.secure_url) {
+      mediaItems.push({ type: 'video', url: videoDoc.secure_url });
+    }
+
+    // Ambil Late accountId untuk platform ini (pasca callback update)
+    const accountRecord = await VendorAccount.findOne({ user_id, platform, connected: true, vendor_profile_id: vendorAccount.vendor_profile_id });
+    let accountId = accountRecord?.vendor_account_id; // may be undefined first time
+
+    if (!accountId) {
+      // Coba sync ulang akun dari Late jika belum ada
+      try {
+        const accounts = await LateService.getAccounts(vendorAccount.vendor_profile_id);
+        const match = accounts.find(a => a.platform === platform);
+        if (match?._id) {
+          accountId = match._id;
+          await VendorAccount.findOneAndUpdate({ _id: accountRecord?._id || undefined, platform, user_id }, { vendor_account_id: accountId }, { upsert: true });
+        }
+      } catch (syncErr) {
+        console.warn('Account sync failed during schedule create:', syncErr.message);
+      }
+    }
+
+    // Bangun payload Late
+    let lateResponse = null;
+    try {
+      const latePayload = {
+        content: caption + (hashtags ? `\n${hashtags}` : ''),
+        mediaItems,
+        platforms: accountId ? [{ platform, accountId }] : undefined,
+        scheduledFor: scheduledDate.toISOString(),
+        timezone: 'UTC'
+      };
+      console.log('[ScheduleCreate] Late schedulePost payload:', latePayload);
+      lateResponse = await LateService.schedulePost(latePayload);
+      // Simpan vendor_job_id / post id jika tersedia
+      if (lateResponse?.post?._id) {
+        schedule.vendor_job_id = lateResponse.post._id; // treat as job/post id
+      } else if (lateResponse?.postId) {
+        schedule.vendor_job_id = lateResponse.postId;
+      }
+    } catch (lateErr) {
+      console.error('Late schedulePost error:', lateErr.response?.data || lateErr.message);
+      // Lanjutkan simpan schedule lokal agar user masih lihat (status pending_failed?)
+      schedule.status = 'pending';
+      schedule.error = 'late_schedule_failed';
+    }
+
+    await schedule.save();
+
+    // Kirim email konfirmasi ke user (ubah dari 30 menit ke 5 menit)
+    try {
+      await sendEmail(
+        req.user.email,
+        "Schedule Posting Dibuat - SMP Planner",
+        `Halo, Schedule posting ke ${platform} berhasil dibuat untuk ${scheduled_at}. Kami akan kirim reminder 5 menit sebelum waktu posting.`
+      );
+    } catch (emailError) {
+      console.error("Error sending confirmation email:", emailError);
+    }
+
+    res.status(201).json({
+      message: "Schedule created successfully",
+      schedule,
+      late: lateResponse ? {
+        mode: 'scheduled',
+        hasPost: !!lateResponse.post,
+        postId: lateResponse.post?._id || lateResponse.postId,
+      } : null
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+  
+
+  static async getSchedules(req, res, next) {
+    try {
+      const { day, month, week, backdate } = req.query;
+      const user_id = req.user.id;
+
+      // Build filter
+      const filter = { user_id };
+      const now = new Date();
+
+      if (backdate) {
+        // Filter backdate: scheduled_at < now
+        filter.scheduled_at = { $lt: now };
+      } else if (day) {
+        // Filter hari ini
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const endOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + 1
+        );
+        filter.scheduled_at = { $gte: startOfDay, $lt: endOfDay };
+      } else if (month) {
+        // Filter bulan ini
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        filter.scheduled_at = { $gte: startOfMonth, $lt: endOfMonth };
+      } else if (week) {
+        // Filter minggu ini (Senin - Minggu)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Senin
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        filter.scheduled_at = { $gte: startOfWeek, $lt: endOfWeek };
+      }
+
+      // Query schedules
+      const schedules = await Schedule.find(filter).sort({ scheduled_at: -1 });
+
+      res.status(200).json({ schedules });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getScheduleById(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+
+      const schedule = await Schedule.findOne({ _id: id, user_id }).populate(
+        "video_id"
+      );
+      if (!schedule) {
+        const error = new Error("Schedule not found");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      res.status(200).json({ schedule });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateSchedule(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+      const updates = req.body; // Expected fields: video_id, platform, caption, hashtags, cover_time, scheduled_at
+
+      // Find schedule that is still pending and belongs to user
+      const schedule = await Schedule.findOne({
+        _id: id,
+        user_id,
+        status: "pending",
+      });
+      if (!schedule) {
+        const error = new Error("Schedule not found or not pending");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      // Validate updates (similar to create, but only for changed fields)
+      if (
+        updates.platform &&
+        !["instagram", "tiktok"].includes(updates.platform)
+      ) {
+        const error = new Error("Invalid platform");
+        error.statusCode = 400;
+        return next(error);
+      }
+
+      // If platform is updated, re-check vendor_account
+      if (updates.platform) {
+        const vendorAccount = await VendorAccount.findOne({
+          user_id,
+          platform: updates.platform,
+          connected: true,
+        });
+        if (!vendorAccount) {
+          const error = new Error("Platform not connected");
+          error.statusCode = 400;
+          return next(error);
+        }
+        schedule.vendor_profile_id = vendorAccount.vendor_profile_id; // Update if platform changed
+      }
+
+      // Apply updates (only allowed fields)
+      const allowedFields = [
+        "video_id",
+        "platform",
+        "caption",
+        "hashtags",
+        "cover_time",
+        "scheduled_at",
+      ];
+      allowedFields.forEach((field) => {
+        if (updates[field] !== undefined) {
+          if (field === "scheduled_at") {
+            schedule[field] = new Date(updates[field]);
+          } else {
+            schedule[field] = updates[field];
+          }
+        }
+      });
+
+      await schedule.save();
+
+      res
+        .status(200)
+        .json({ message: "Schedule updated successfully", schedule });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteSchedule(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+
+      const schedule = await Schedule.findOneAndDelete({
+        _id: id,
+        user_id,
+        status: "pending",
+      });
+      if (!schedule) {
+        const error = new Error("Schedule not found or not pending");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      res.status(200).json({ message: "Schedule deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Tambahkan di class SchedulesController
+  static async runNow(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user_id = req.user.id;
+
+      // Find schedule pending milik user
+      const schedule = await Schedule.findOne({
+        _id: id,
+        user_id,
+        status: "pending",
+      });
+      if (!schedule) {
+        const error = new Error("Schedule not found or not pending");
+        error.statusCode = 404;
+        return next(error);
+      }
+
+      // Set processing (idempotent, jika sudah processing, skip)
+      if (schedule.status === "processing") {
+        return res.status(200).json({ message: "Already processing" });
+      }
+      await Schedule.findByIdAndUpdate(id, {
+        status: "processing",
+        locked_at: new Date(),
+      });
+
+      // Ambil video untuk mediaItems
+      const Video = require('../models/Video');
+      const videoDoc = await Video.findOne({ _id: schedule.video_id, user_id });
+      const mediaItems = [];
+      if (videoDoc?.secure_url) {
+        mediaItems.push({ type: 'video', url: videoDoc.secure_url });
+      }
+
+      // Pastikan punya accountId
+      const VendorAccount = require('../models/VendorAccount');
+      let accountRecord = await VendorAccount.findOne({ user_id, platform: schedule.platform, vendor_profile_id: schedule.vendor_profile_id });
+      let accountId = accountRecord?.vendor_account_id;
+      if (!accountId) {
+        try {
+          const accounts = await LateService.getAccounts(schedule.vendor_profile_id);
+            const match = accounts.find(a => a.platform === schedule.platform);
+            if (match?._id) {
+              accountId = match._id;
+              await VendorAccount.findOneAndUpdate({ _id: accountRecord?._id || undefined, platform: schedule.platform, user_id }, { vendor_account_id: accountId }, { upsert: true });
+            }
+        } catch (e) {
+          console.warn('Failed to sync accounts in runNow:', e.message);
+        }
+      }
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'Unable to resolve Late accountId for platform' });
+      }
+
+      // Publish now via Late
+      let publishResp;
+      try {
+        publishResp = await LateService.publishNow({
+          content: schedule.caption + (schedule.hashtags ? `\n${schedule.hashtags}` : ''),
+          mediaItems,
+          platforms: [{ platform: schedule.platform, accountId }]
+        });
+      } catch (pubErr) {
+        console.error('Late publishNow error:', pubErr.response?.data || pubErr.message);
+        await Schedule.findByIdAndUpdate(id, { status: 'failed', error: 'late_publish_failed' });
+        return res.status(500).json({ error: 'Late publish failed' });
+      }
+
+      const postId = publishResp?.post?._id || publishResp?.postId;
+      if (postId) {
+        await Schedule.findByIdAndUpdate(id, { vendor_job_id: postId });
+      }
+
+      res.status(200).json({ message: 'Publish initiated', postId });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+module.exports = SchedulesController;

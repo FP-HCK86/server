@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Schedule = require('../models/Schedule');
 const { sendEmail } = require('../helpers/email');
 const moment = require('moment-timezone'); // Tambahkan ini
+const LateService = require('../services/lateService');
 
 class CronScheduler {
   static start() {

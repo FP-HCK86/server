@@ -1,4 +1,4 @@
-const { getUserAccounts } = require('../services/connectSocialLate.service');
+const { getUserAccounts } = require('../services/lateService');
 const VendorAccount = require('../models/VendorAccount');
 
 exports.getUserProfile = async (req, res) => {

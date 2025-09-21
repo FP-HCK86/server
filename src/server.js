@@ -51,6 +51,9 @@ app.use('/ai', aiRoutes);
 const personaRoutes = require('./routes/persona.routes');
 app.use('/personas', personaRoutes);
 
+const chatSessionsRoutes = require('./routes/chatSessions.routes');
+app.use('/chat-sessions', chatSessionsRoutes);
+
 const videosRouter = require('./routes/videos.routes');
 app.use('/videos', videosRouter);
 

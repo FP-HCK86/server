@@ -2,6 +2,7 @@ const Schedule = require("../models/Schedule");
 const VendorAccount = require("../models/VendorAccount");
 const mongoose = require("mongoose");
 const { sendEmail } = require("../helpers/email");
+const LateService = require("../services/lateService");
 
 class SchedulesController {
 
@@ -52,16 +53,13 @@ class SchedulesController {
       platform,
       connected: true,
     });
+    
     if (!vendorAccount) {
-      // For development, create a dummy vendor account
-      vendorAccount = new VendorAccount({
-        user_id,
-        platform,
-        vendor_profile_id: "dummy_profile_" + platform,
-        connected: true,
+      return res.status(400).json({
+        success: false,
+        message: `No connected ${platform} account found. Please connect your ${platform} account first.`,
+        error: "ACCOUNT_NOT_CONNECTED"
       });
-      await vendorAccount.save();
-      console.log("Created dummy vendor account", vendorAccount);
     }
 
     // Create schedule
@@ -75,15 +73,23 @@ class SchedulesController {
       vendor_profile_id: vendorAccount.vendor_profile_id,
     });
 
-    // Konversi scheduled_at dari WIB ke UTC
-    const scheduledAtWIB = new Date(scheduled_at); // Input WIB
-    if (isNaN(scheduledAtWIB.getTime())) {
+    // FE already sends scheduled_at as an ISO string in UTC (it builds local +07:00 then .toISOString())
+    // Previously we subtracted 7h again, resulting in past times and immediate publish.
+    // Now: trust incoming timestamp and just parse it.
+    const scheduledAtUTC = new Date(scheduled_at);
+    if (isNaN(scheduledAtUTC.getTime())) {
       const error = new Error("Invalid scheduled_at date");
       error.statusCode = 400;
       return next(error);
     }
-    const offset = 7 * 60 * 60 * 1000; // UTC+7 offset in ms
-    const scheduledDate = new Date(scheduledAtWIB.getTime() - offset); // Simpan sebagai UTC
+    // Must be at least 60s in the future to allow Late to schedule properly
+    if (scheduledAtUTC.getTime() < Date.now() + 60 * 1000) {
+      const error = new Error("Waktu schedule harus minimal 1 menit di depan waktu sekarang");
+      error.statusCode = 400;
+      return next(error);
+    }
+    const scheduledDate = scheduledAtUTC; // already UTC
+    console.log('[ScheduleCreate] scheduled_at(raw)=', scheduled_at, 'storedUTC=', scheduledDate.toISOString());
 
     const schedule = new Schedule({
       user_id,
@@ -92,10 +98,61 @@ class SchedulesController {
       caption,
       hashtags: hashtags || "",
       cover_time,
-      scheduled_at: scheduledDate, // Simpan sebagai UTC
+  scheduled_at: scheduledDate, // already UTC
       vendor_profile_id: vendorAccount.vendor_profile_id,
       status: "pending",
     });
+
+    // Ambil video secure_url (butuh populate atau query manual)
+    const Video = require('../models/Video');
+    const videoDoc = await Video.findOne({ _id: videoId, user_id });
+    let mediaItems = [];
+    if (videoDoc?.secure_url) {
+      mediaItems.push({ type: 'video', url: videoDoc.secure_url });
+    }
+
+    // Ambil Late accountId untuk platform ini (pasca callback update)
+    const accountRecord = await VendorAccount.findOne({ user_id, platform, connected: true, vendor_profile_id: vendorAccount.vendor_profile_id });
+    let accountId = accountRecord?.vendor_account_id; // may be undefined first time
+
+    if (!accountId) {
+      // Coba sync ulang akun dari Late jika belum ada
+      try {
+        const accounts = await LateService.getAccounts(vendorAccount.vendor_profile_id);
+        const match = accounts.find(a => a.platform === platform);
+        if (match?._id) {
+          accountId = match._id;
+          await VendorAccount.findOneAndUpdate({ _id: accountRecord?._id || undefined, platform, user_id }, { vendor_account_id: accountId }, { upsert: true });
+        }
+      } catch (syncErr) {
+        console.warn('Account sync failed during schedule create:', syncErr.message);
+      }
+    }
+
+    // Bangun payload Late
+    let lateResponse = null;
+    try {
+      const latePayload = {
+        content: caption + (hashtags ? `\n${hashtags}` : ''),
+        mediaItems,
+        platforms: accountId ? [{ platform, accountId }] : undefined,
+        scheduledFor: scheduledDate.toISOString(),
+        timezone: 'UTC'
+      };
+      console.log('[ScheduleCreate] Late schedulePost payload:', latePayload);
+      lateResponse = await LateService.schedulePost(latePayload);
+      // Simpan vendor_job_id / post id jika tersedia
+      if (lateResponse?.post?._id) {
+        schedule.vendor_job_id = lateResponse.post._id; // treat as job/post id
+      } else if (lateResponse?.postId) {
+        schedule.vendor_job_id = lateResponse.postId;
+      }
+    } catch (lateErr) {
+      console.error('Late schedulePost error:', lateErr.response?.data || lateErr.message);
+      // Lanjutkan simpan schedule lokal agar user masih lihat (status pending_failed?)
+      schedule.status = 'pending';
+      schedule.error = 'late_schedule_failed';
+    }
 
     await schedule.save();
 
@@ -110,9 +167,15 @@ class SchedulesController {
       console.error("Error sending confirmation email:", emailError);
     }
 
-    res
-      .status(201)
-      .json({ message: "Schedule created successfully", schedule });
+    res.status(201).json({
+      message: "Schedule created successfully",
+      schedule,
+      late: lateResponse ? {
+        mode: 'scheduled',
+        hasPost: !!lateResponse.post,
+        postId: lateResponse.post?._id || lateResponse.postId,
+      } : null
+    });
   } catch (error) {
     next(error);
   }
@@ -309,29 +372,55 @@ class SchedulesController {
         locked_at: new Date(),
       });
 
-      // Panggil LateService.publishNow
-      const mediaUrl = "https://res.cloudinary.com/..."; // Ganti dengan secure_url dari Video
-      const result = await LateService.publishNow({
-        vendor_profile_id: schedule.vendor_profile_id,
-        platform: schedule.platform,
-        mediaUrl,
-        caption: schedule.caption,
-        idempotencyKey: schedule._id.toString(),
-      });
-
-      // Simpan vendor_job_id
-      if (result.vendor_job_id) {
-        await Schedule.findByIdAndUpdate(id, {
-          vendor_job_id: result.vendor_job_id,
-        });
+      // Ambil video untuk mediaItems
+      const Video = require('../models/Video');
+      const videoDoc = await Video.findOne({ _id: schedule.video_id, user_id });
+      const mediaItems = [];
+      if (videoDoc?.secure_url) {
+        mediaItems.push({ type: 'video', url: videoDoc.secure_url });
       }
 
-      res
-        .status(200)
-        .json({
-          message: "Publish initiated",
-          vendor_job_id: result.vendor_job_id,
+      // Pastikan punya accountId
+      const VendorAccount = require('../models/VendorAccount');
+      let accountRecord = await VendorAccount.findOne({ user_id, platform: schedule.platform, vendor_profile_id: schedule.vendor_profile_id });
+      let accountId = accountRecord?.vendor_account_id;
+      if (!accountId) {
+        try {
+          const accounts = await LateService.getAccounts(schedule.vendor_profile_id);
+            const match = accounts.find(a => a.platform === schedule.platform);
+            if (match?._id) {
+              accountId = match._id;
+              await VendorAccount.findOneAndUpdate({ _id: accountRecord?._id || undefined, platform: schedule.platform, user_id }, { vendor_account_id: accountId }, { upsert: true });
+            }
+        } catch (e) {
+          console.warn('Failed to sync accounts in runNow:', e.message);
+        }
+      }
+
+      if (!accountId) {
+        return res.status(400).json({ error: 'Unable to resolve Late accountId for platform' });
+      }
+
+      // Publish now via Late
+      let publishResp;
+      try {
+        publishResp = await LateService.publishNow({
+          content: schedule.caption + (schedule.hashtags ? `\n${schedule.hashtags}` : ''),
+          mediaItems,
+          platforms: [{ platform: schedule.platform, accountId }]
         });
+      } catch (pubErr) {
+        console.error('Late publishNow error:', pubErr.response?.data || pubErr.message);
+        await Schedule.findByIdAndUpdate(id, { status: 'failed', error: 'late_publish_failed' });
+        return res.status(500).json({ error: 'Late publish failed' });
+      }
+
+      const postId = publishResp?.post?._id || publishResp?.postId;
+      if (postId) {
+        await Schedule.findByIdAndUpdate(id, { vendor_job_id: postId });
+      }
+
+      res.status(200).json({ message: 'Publish initiated', postId });
     } catch (error) {
       next(error);
     }

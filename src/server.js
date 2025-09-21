@@ -4,12 +4,16 @@ const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
 // const CronScheduler = require('./jobs/cron.scheduler')
+const paymentRoutes = require('./routes/payment.routes');
+
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
 const app = express();
 
+
 // CORS configuration
+
 // const corsOptions = {
 //   origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
 //   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -19,6 +23,9 @@ const app = express();
 
 // app.use(cors(corsOptions));
 
+app.use(cors())
+
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
@@ -27,6 +34,9 @@ app.use(express.urlencoded({ extended: true }))
 
 app.use('/auth', authRoutes);
 app.use('/', authRoutes)
+
+// Midtrans payment
+app.use('/payment', paymentRoutes);
 
 // CHECK API CONNECT
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));

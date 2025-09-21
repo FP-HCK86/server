@@ -24,17 +24,6 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
-
-  // Used for Social Media Integration Platform
-  profileId: {
-    type: String,
-    sparse: true, // Late API profile ID for social media connections
-
-  isPremium: {  
-    type: Boolean,
-    default: false,  // Default false, set true setelah pembayaran berhasil
-
-  },
 }, {
   timestamps: true,
 });

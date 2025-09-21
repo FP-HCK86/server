@@ -25,8 +25,8 @@ module.exports = async function authentication(req, res, next) {
       _id: user._id,
       id: user._id,
       email: user.email,
-      name: user.name,
-      role: user.role,
+      username: user.username,
+    
     };
     next();
   } catch (err) {

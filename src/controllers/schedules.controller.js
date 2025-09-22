@@ -8,6 +8,25 @@ class SchedulesController {
 
   static async createSchedule(req, res, next) {
   try {
+    // Enforce free-tier schedule limit using atomic update to avoid races
+    const User = require('../models/User');
+    let incremented = false;
+    let updatedUser = null;
+    const userId = req.user.id;
+    const userDoc = await User.findById(userId);
+    if (userDoc && userDoc.subscription === 'free') {
+      // Try to atomically increment scheduleCount only if < 3
+      updatedUser = await User.findOneAndUpdate(
+        { _id: userId, subscription: 'free', scheduleCount: { $lt: 3 } },
+        { $inc: { scheduleCount: 1 } },
+        { new: true }
+      );
+      if (!updatedUser) {
+        // Could not increment (limit reached)
+        return res.status(403).json({ error: 'Limit reached. Upgrade to premium.', redirectTo: '/upgrade' });
+      }
+      incremented = true;
+    }
     const {
       video_id,
       platform,
@@ -154,7 +173,19 @@ class SchedulesController {
       schedule.error = 'late_schedule_failed';
     }
 
-    await schedule.save();
+    try {
+      await schedule.save();
+    } catch (saveErr) {
+      // rollback increment if we previously incremented scheduleCount
+      if (incremented) {
+        try {
+          await User.findByIdAndUpdate(userId, { $inc: { scheduleCount: -1 } });
+        } catch (rbErr) {
+          console.error('Failed to rollback scheduleCount after save error', rbErr);
+        }
+      }
+      throw saveErr;
+    }
 
     // Kirim email konfirmasi ke user (tanpa reminder 5 menit, sistem akan auto publish)
     try {

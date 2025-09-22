@@ -70,6 +70,9 @@ app.use('/connect', connectSocialLateRoutes);
 
 const userRoutes = require('./routes/user.routes');
 app.use('/user', userRoutes);
+// Payment routes (Midtrans integration)
+const paymentRoutes = require('./routes/payment.routes');
+app.use('/payment', paymentRoutes);
 const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
 

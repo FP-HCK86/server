@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const requiredKeys = ['PORT', 'MONGODB_URI', 'JWT_SECRET'];
+const requiredKeys = ['PORT', 'MONGODB_URI', 'JWT_SECRET', 'OPENAI_API_KEY'];
 const optionalKeys = ['LATE_API_KEY', 'LATE_BASE_URL'];
 
 requiredKeys.forEach((k) => {

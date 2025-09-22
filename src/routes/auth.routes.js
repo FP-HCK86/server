@@ -26,6 +26,7 @@ router.post('/login', authController.login);
 
 // PROTECTED ROUTES
 router.get('/profile', authentication, authController.getProfile);
+router.patch('/profile', authentication, authController.updateProfile);
 router.post('/upload-avatar', authentication, upload.single('avatar'), authController.uploadAvatar);
 router.get('/dashboard', authentication, (req, res) => {
   res.json({ user: req.user });

@@ -1,8 +1,15 @@
+const { getUserAccounts } = require('../services/connectSocialLate.service');
 const VendorAccount = require('../models/VendorAccount');
 
 exports.getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Coba ambil dari connectSocialLate service dulu
+    let userAccounts = getUserAccounts(userId);
+    if (userAccounts?.profileId) {
+      return res.json({ profileId: userAccounts.profileId });
+    }
 
     // Fallback: ambil dari VendorAccount (asumsikan sama untuk semua platform)
     const vendorAccount = await VendorAccount.findOne({ user_id: userId });

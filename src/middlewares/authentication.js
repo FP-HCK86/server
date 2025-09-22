@@ -5,9 +5,16 @@ const env = require("../config/env");
 module.exports = async function authentication(req, res, next) {
   try {
     const { authorization } = req.headers;
-    if (!authorization) throw { status: 401, message: "Missing token" };
+    
+    if (!authorization) {
+      throw { status: 401, message: "Missing token" };
+    }
     
     const token = authorization.split(" ")[1];
+    if (!token) {
+      throw { status: 401, message: "Missing token" };
+    }
+    
     const payload = jwt.verify(token, env.jwtSecret);
     
     // Use Mongoose instead of Sequelize
@@ -15,6 +22,7 @@ module.exports = async function authentication(req, res, next) {
     if (!user) throw { status: 401, message: "Invalid user" };
     
     req.user = {
+      _id: user._id,
       id: user._id,
       email: user.email,
       name: user.name,

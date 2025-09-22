@@ -3,21 +3,21 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-// const CronScheduler = require('./jobs/cron.scheduler')
+const CronScheduler = require('./jobs/cron.scheduler')
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
 const app = express();
 
 // CORS configuration
-const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true
-};
+// const corsOptions = {
+//   origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+//   credentials: true
+// };
 
-app.use(cors(corsOptions));
+app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
@@ -74,7 +74,7 @@ const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
 
 // Start cron after DB connect
-// CronScheduler.start();
+CronScheduler.start();
 
 // CHECK CONNECTION DATABASE
 connectDB();

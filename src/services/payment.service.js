@@ -23,8 +23,20 @@ class PaymentService {
 
   // Method untuk verify payment status (dari webhook Midtrans)
   async verifyPayment(orderId) {
-    // Panggil Midtrans API untuk check status
-    // Implementasi lengkap di docs Midtrans
+    // Use CoreApi to query transaction status
+    const core = new midtransClient.CoreApi({
+      isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+      serverKey: process.env.SERVER_KEY_MIDTRANS,
+      clientKey: process.env.CLIENT_KEY_MIDTRANS,
+    });
+
+    try {
+      const status = await core.transaction.status(orderId);
+      return status;
+    } catch (err) {
+      console.error('[PaymentService] verifyPayment error', err && err.message);
+      throw err;
+    }
   }
 }
 

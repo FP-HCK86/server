@@ -3,20 +3,6 @@ const lateService = require('../services/lateService');
 const VendorAccount = require('../models/VendorAccount');
 const axios = require("axios");
 
-/**
- * Initiate an OAuth connection for a given social platform via Late.
- *
- * This controller inspects whether the authenticated user already has a
- * Late profile and corresponding VendorAccount record. If a profile does not
- * yet exist, it will be created via Late and persisted. The user is then
- * redirected to Late's OAuth page where they will grant access to their
- * social account. Late will subsequently redirect back to the
- * `connectCallback` endpoint.
- *
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- */
-// Contoh perbaikan: tidak perlu profileId dari FE
 exports.startConnect = async (req, res) => {
   try {
     const { platform } = req.params;

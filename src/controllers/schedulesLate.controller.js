@@ -3,26 +3,6 @@ const lateService = require('../services/lateService');
 const VendorAccount = require('../models/VendorAccount');
 const Schedule = require('../models/Schedule');
 
-/**
- * Controller to schedule or immediately publish a social post via Late.
- *
- * It constructs the appropriate payload for Late based on the supplied
- * parameters, resolves the user's connected accounts for each platform,
- * invokes Late and persists a Schedule record. The request body should
- * include:
- *   - content: string (required)
- *   - mediaUrls: array of strings (optional)
- *   - platforms: array of platform strings (optional). If omitted or
- *                contains 'all', all connected platforms will be used.
- *   - scheduledTime: ISO 8601 date/time (optional). If omitted the post
- *                    will be published immediately.
- *
- * This endpoint assumes that req.user has been populated via an
- * authentication middleware.
- *
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- */
 exports.schedulePost = async function schedulePost(req, res) {
   try {
     const userId = req.user._id;
@@ -98,9 +78,30 @@ exports.schedulePost = async function schedulePost(req, res) {
       scheduled_at: scheduledAt,
       vendor_profile_id: profileId,
       vendor_job_id: lateResponse.id,
-      status: scheduledTime ? 'scheduled' : 'posted',
+  // Use enum-compliant statuses: pending (future), posted (immediate)
+  status: scheduledTime ? 'pending' : 'posted',
     });
     await newSchedule.save();
+
+    // Kirim email konfirmasi pembuatan schedule (jika future) atau publish langsung
+    try {
+      const { sendEmail } = require('../helpers/email');
+      if (scheduledTime) {
+        await sendEmail(
+          req.user.email,
+          'Schedule Posting Dibuat - SMP Planner',
+          `Halo, Schedule posting ke platform (${accountsToUse.map(a=>a.platform).join(', ')}) berhasil dibuat untuk ${scheduledAt.toISOString()}. Sistem akan otomatis mempublish dan mengirim email sukses/gagal.`
+        );
+      } else {
+        await sendEmail(
+          req.user.email,
+          'Posting Berhasil Dibuat - SMP Planner',
+          `Halo, Posting langsung berhasil dipublish (${accountsToUse.map(a=>a.platform).join(', ')}) pada ${scheduledAt.toISOString()}.`
+        );
+      }
+    } catch (e) {
+      console.warn('Creation email failed (late controller):', e.message);
+    }
 
     return res.json({
       message: scheduledTime ? 'Post scheduled successfully' : 'Post published successfully',

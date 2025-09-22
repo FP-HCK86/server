@@ -1,87 +1,120 @@
 const cron = require('node-cron');
 const Schedule = require('../models/Schedule');
 const { sendEmail } = require('../helpers/email');
-const moment = require('moment-timezone'); // Tambahkan ini
+const moment = require('moment-timezone');
 const LateService = require('../services/lateService');
 
 class CronScheduler {
- static start() {
-  // Cron job setiap 5 menit untuk cek schedule
-  cron.schedule('*/5 * * * *', async () => {
-    try {
-      console.log('Running cron job for schedule reminders and posting...');
-      const nowWIB = moment().tz('Asia/Jakarta'); // Waktu saat ini dalam WIB
-      const now = nowWIB.utc().toDate(); // Convert ke UTC untuk query MongoDB
-      const fiveMinutesFromNow = nowWIB.add(5, 'minutes').utc().toDate(); // UTC +5 menit
+  static start() {
+    // Cron job tiap 1 menit: ambil semua schedule yang sudah waktunya dan masih pending, claim -> processing -> publish
+    cron.schedule('* * * * *', async () => {
+      const startTick = Date.now();
+      console.log('[Cron] Tick start');
+      try {
+        const now = new Date();
 
-      // Cari schedule yang kurang dari 5 menit (dalam UTC)
-      const upcomingSchedules = await Schedule.find({
-        scheduled_at: { $gte: now, $lte: fiveMinutesFromNow },
-        status: 'pending',
-      }).populate('user_id');
-
-      for (const schedule of upcomingSchedules) {
-        // Kirim email reminder jika waktu 5 menit lagi
-        try {
-          await sendEmail(
-            schedule.user_id.email,
-            'Reminder: Posting Sosmed Segera Dimulai - SMP Planner',
-            `Halo ${schedule.user_id.username}, Posting ke ${schedule.platform} akan dimulai dalam 5 menit (${moment(schedule.scheduled_at).tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}). Siapkan konten Anda!` // Format WIB untuk email
-          );
-          console.log(`Reminder email sent to ${schedule.user_id.email}`);
-        } catch (emailError) {
-          console.error('Error sending reminder email:', emailError);
+        // Ambil batch pending (limit untuk hindari memory blow). Gunakan findOneAndUpdate loop untuk atomic claim.
+        const batchSize = 10; // adjustable
+        let claimed = [];
+        for (let i = 0; i < batchSize; i++) {
+          const doc = await Schedule.findOneAndUpdate(
+            {
+              scheduled_at: { $lte: now },
+              status: 'pending'
+            },
+            { $set: { status: 'processing', locked_at: new Date() } },
+            { new: true }
+          ).populate('user_id');
+          if (!doc) break;
+          claimed.push(doc);
         }
 
-        // Update status agar tidak dikirim ulang
-        schedule.status = 'reminded';
-        await schedule.save();
-      }
-
-      // Posting otomatis jika waktu tiba
-      const dueSchedules = await Schedule.find({
-        scheduled_at: { $lte: now },
-        status: 'reminded',
-      }).populate('user_id');
-
-      for (const schedule of dueSchedules) {
-        try {
-          await LateService.publishNow({
-            profileId: schedule.vendor_profile_id,
-            platform: schedule.platform,
-            mediaItems: [{ url: schedule.video_id, type: 'video' }],
-            content: schedule.caption,
-            timezone: 'Asia/Jakarta',
-          });
-
-          // Kirim email sukses
-          await sendEmail(
-            schedule.user_id.email,
-            'Posting Sosmed Berhasil - SMP Planner',
-            `Halo ${schedule.user_id.username}, Posting ke ${schedule.platform} berhasil dilakukan pada ${moment(schedule.scheduled_at).tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}.`
-          );
-
-          schedule.status = 'completed';
-          await schedule.save();
-          console.log(`Posting completed for schedule ${schedule._id}`);
-        } catch (error) {
-          console.error('Error posting:', error);
-          // Kirim email error
-          await sendEmail(
-            schedule.user_id.email,
-            'Error Posting Sosmed - SMP Planner',
-            `Halo ${schedule.user_id.username}, Ada error saat posting ke ${schedule.platform}: ${error.message}.`
-          );
+        if (!claimed.length) {
+          console.log('[Cron] No due schedules this tick');
+          return;
         }
+
+        for (const schedule of claimed) {
+          try {
+            // TODO: Ambil URL video sebenarnya (populate video) jika field video_id adalah ObjectId Video
+            // Untuk saat ini asumsi caption + hashtags
+            const Video = require('../models/Video');
+            let mediaItems = [];
+            try {
+              const videoDoc = await Video.findById(schedule.video_id);
+              if (videoDoc?.secure_url) {
+                mediaItems.push({ type: 'video', url: videoDoc.secure_url });
+              }
+            } catch (e) {
+              console.warn('[Cron] fetch video error', e.message);
+            }
+
+            // Pastikan accountId (mirip runNow logic). Sederhanakan: jika gagal dapat accountId, fail.
+            const VendorAccount = require('../models/VendorAccount');
+            let accountRecord = await VendorAccount.findOne({ user_id: schedule.user_id._id, platform: schedule.platform, vendor_profile_id: schedule.vendor_profile_id });
+            let accountId = accountRecord?.vendor_account_id;
+            if (!accountId) {
+              try {
+                const accounts = await LateService.getAccounts(schedule.vendor_profile_id);
+                const match = accounts.find(a => a.platform === schedule.platform);
+                if (match?._id) {
+                  accountId = match._id;
+                  await VendorAccount.findOneAndUpdate({ _id: accountRecord?._id || undefined, platform: schedule.platform, user_id: schedule.user_id._id }, { vendor_account_id: accountId }, { upsert: true });
+                }
+              } catch (syncErr) {
+                console.warn('[Cron] account sync failed:', syncErr.message);
+              }
+            }
+
+            if (!accountId) {
+              await Schedule.findByIdAndUpdate(schedule._id, { status: 'failed', error: 'account_not_resolved' });
+              await sendEmail(
+                schedule.user_id.email,
+                'Posting Gagal - SMP Planner',
+                `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} gagal karena akun tidak dapat di-resolve. (#account_not_resolved)`
+              );
+              continue;
+            }
+
+            let publishResp;
+            try {
+              publishResp = await LateService.publishNow({
+                content: schedule.caption + (schedule.hashtags ? `\n${schedule.hashtags}` : ''),
+                mediaItems,
+                platforms: [{ platform: schedule.platform, accountId }]
+              });
+            } catch (pubErr) {
+              console.error('[Cron] Late publish error:', pubErr.response?.data || pubErr.message);
+              await Schedule.findByIdAndUpdate(schedule._id, { status: 'failed', error: 'late_publish_failed' });
+              await sendEmail(
+                schedule.user_id.email,
+                'Posting Gagal - SMP Planner',
+                `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} gagal dipublish. Error: ${pubErr.message}`
+              );
+              continue;
+            }
+
+            const postId = publishResp?.post?._id || publishResp?.postId;
+            await Schedule.findByIdAndUpdate(schedule._id, { status: 'posted', vendor_job_id: postId });
+            await sendEmail(
+              schedule.user_id.email,
+              'Posting Berhasil - SMP Planner',
+              `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} telah berhasil dipublish pada ${moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}.`);
+            console.log('[Cron] Posted schedule', schedule._id.toString());
+          } catch (innerErr) {
+            console.error('[Cron] Unexpected processing error:', innerErr);
+            await Schedule.findByIdAndUpdate(schedule._id, { status: 'failed', error: 'unexpected_processing_error' });
+          }
+        }
+      } catch (error) {
+        console.error('[Cron] tick error:', error);
+      } finally {
+        console.log('[Cron] Tick done in', Date.now() - startTick, 'ms');
       }
-    } catch (error) {
-      console.error('Cron job error:', error);
-    }
-  });
+    });
 
-  console.log('Cron scheduler started successfully');
-}
-
+    console.log('Cron scheduler (Option1 simplified) started successfully');
+  }
 }
 
 module.exports = CronScheduler;

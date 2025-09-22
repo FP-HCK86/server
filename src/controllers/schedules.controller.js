@@ -156,12 +156,12 @@ class SchedulesController {
 
     await schedule.save();
 
-    // Kirim email konfirmasi ke user (ubah dari 30 menit ke 5 menit)
+    // Kirim email konfirmasi ke user (tanpa reminder 5 menit, sistem akan auto publish)
     try {
       await sendEmail(
         req.user.email,
         "Schedule Posting Dibuat - SMP Planner",
-        `Halo, Schedule posting ke ${platform} berhasil dibuat untuk ${scheduled_at}. Kami akan kirim reminder 5 menit sebelum waktu posting.`
+        `Halo, Schedule posting ke ${platform} berhasil dibuat untuk ${scheduled_at}. Sistem akan otomatis mem-publish pada waktu tersebut dan kamu akan menerima email berhasil atau gagal setelah proses.`
       );
     } catch (emailError) {
       console.error("Error sending confirmation email:", emailError);

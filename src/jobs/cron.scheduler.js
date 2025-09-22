@@ -6,6 +6,11 @@ const LateService = require('../services/lateService');
 
 class CronScheduler {
   static start() {
+    if (this._started) {
+      console.log('[Cron] Already started, skip');
+      return;
+    }
+    this._started = true;
     // Cron job tiap 1 menit: ambil semua schedule yang sudah waktunya dan masih pending, claim -> processing -> publish
     cron.schedule('* * * * *', async () => {
       const startTick = Date.now();

@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
-const CronScheduler = require('./jobs/cron.scheduler')
+const CronScheduler = require('./jobs/cron.scheduler');
 
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
@@ -61,7 +61,7 @@ const accountLateRoutes = require('./routes/accountLate.routes');
 app.use('/accounts', accountLateRoutes);
 
 const vendorRoutes = require('./routes/vendor.routes');
-require('./jobs/cron.scheduler');
+// Removed bare require of cron file (we will explicitly start it after DB connects)
 app.use('/vendor', vendorRoutes);
 
 
@@ -74,11 +74,12 @@ const errorHandler = require('./middlewares/errorHandller');
 app.use(errorHandler);
 
 // Start cron after DB connect
-CronScheduler.start();
+// CronScheduler.start();
 
 // CHECK CONNECTION DATABASE
-connectDB();
-
-app.listen(PORT, () => {
+connectDB().then(() => {
+  CronScheduler.start();
+  app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+  });
 });

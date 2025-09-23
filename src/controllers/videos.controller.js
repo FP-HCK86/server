@@ -498,27 +498,72 @@ const deleteVideoAnalysis = async (req, res) => {
     const user_id = req.user.id;
     const { id } = req.params;
 
+    console.log('🗑️ Deleting video analysis for video:', id);
+
     // Find video owned by user
     const video = await Video.findOne({ _id: id, user_id });
     if (!video) {
       return res.status(404).json({ error: "Video not found" });
     }
 
-    // Remove AI analysis data
-    const updateData = {
-      hasAIAnalysis: false,
-      transcript: null,
-      transcript_status: null,
-      transcript_metadata: null,
-      aiAnalysis: null,
-      aiSuggestions: null
-    };
-
-    const updatedVideo = await Video.findByIdAndUpdate(
-      id,
-      { $unset: updateData },
-      { new: true }
+    // Use MongoDB native operations to completely remove fields
+    await Video.updateOne(
+      { _id: id },
+      {
+        $unset: {
+          "transcript": 1,
+          "transcript_metadata": 1,
+          "aiAnalysis": 1,
+          "aiSuggestions": 1,
+          "analysis_status": 1,
+          "transcript_status": 1
+        }
+      }
     );
+
+    // Set the boolean flags
+    await Video.updateOne(
+      { _id: id },
+      {
+        $set: {
+          hasAIAnalysis: false,
+          hasTranscript: false
+        }
+      }
+    );
+
+    // Force fresh query from database to verify cleanup
+    const updatedVideo = await Video.findById(id).lean();
+
+    // If fields still exist, force manual removal (fallback mechanism)
+    if (updatedVideo.transcript || updatedVideo.aiAnalysis || updatedVideo.aiSuggestions || updatedVideo.transcript_metadata) {
+      await Video.replaceOne(
+        { _id: id },
+        {
+          _id: updatedVideo._id,
+          user_id: updatedVideo.user_id,
+          title: updatedVideo.title,
+          caption: updatedVideo.caption,
+          hashtags: updatedVideo.hashtags,
+          secure_url: updatedVideo.secure_url,
+          public_id: updatedVideo.public_id,
+          duration_sec: updatedVideo.duration_sec,
+          createdAt: updatedVideo.createdAt,
+          updatedAt: new Date(),
+          __v: updatedVideo.__v,
+          hasAIAnalysis: false,
+          hasTranscript: false
+          // Explicitly exclude: transcript, transcript_metadata, aiAnalysis, aiSuggestions, etc.
+        }
+      );
+      
+      // Get the manually cleaned video
+      const finalVideo = await Video.findById(id).lean();
+      return res.json({
+        message: "Video analysis deleted successfully",
+        video: finalVideo
+      });
+    }
 
     return res.json({
       message: "Video analysis deleted successfully",

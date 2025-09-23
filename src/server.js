@@ -82,6 +82,12 @@ app.use(errorHandler);
 // CHECK CONNECTION DATABASE
 connectDB().then(() => {
   CronScheduler.start();
+  // Start daily downgrade job (downgradeSubscriptions registers its cron on require)
+  try {
+    require('./jobs/downgradeSubscriptions');
+  } catch (e) {
+    console.warn('Failed to start downgradeSubscriptions job', e && e.message);
+  }
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

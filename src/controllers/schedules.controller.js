@@ -3,6 +3,7 @@ const VendorAccount = require("../models/VendorAccount");
 const mongoose = require("mongoose");
 const { sendEmail } = require("../helpers/email");
 const LateService = require("../services/lateService");
+const { downgradeIfExpired } = require('../helpers/subscription');
 
 class SchedulesController {
   static async createSchedule(req, res, next) {
@@ -12,11 +13,17 @@ class SchedulesController {
       let incremented = false;
       let updatedUser = null;
       const userId = req.user.id;
+      // ensure user's subscription is up-to-date (auto-downgrade if expiry passed)
+      try {
+        await downgradeIfExpired(userId);
+      } catch (e) {
+        console.warn('[createSchedule] downgradeIfExpired failed', e && e.message);
+      }
       const userDoc = await User.findById(userId);
       if (userDoc && userDoc.subscription === "free") {
         // Try to atomically increment scheduleCount only if < 3
         updatedUser = await User.findOneAndUpdate(
-          { _id: userId, subscription: "free", scheduleCount: { $lt: 3 } },
+          { _id: userId, subscription: "free", scheduleCount: { $lt: 2 } },
           { $inc: { scheduleCount: 1 } },
           { new: true }
         );
@@ -26,7 +33,7 @@ class SchedulesController {
             .status(403)
             .json({
               error:
-                "Anda telah mencapai batas 3 schedule. Upgrade untuk akses unlimited.",
+                "Anda telah mencapai batas 2 schedule. Upgrade untuk akses unlimited.",
               redirectTo: "/upgrade",
             });
         }

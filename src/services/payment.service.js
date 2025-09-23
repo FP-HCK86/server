@@ -10,7 +10,8 @@ class PaymentService {
   }
 
   async createTransaction(orderId, amount, customerDetails) {
-    const parameter = {
+    // Build the payload
+    const payload = {
       transaction_details: {
         order_id: orderId,
         gross_amount: amount,  // e.g., 50000 (Rp 50k untuk 1 bulan akses)
@@ -18,7 +19,40 @@ class PaymentService {
       customer_details: customerDetails,
       credit_card: { secure: true },
     };
-    return await this.snap.createTransaction(parameter);
+
+    // Detailed logging for debugging Midtrans failures
+    console.info('PaymentService.createTransaction: request', {
+      orderId,
+      amount,
+      customerDetails,
+      // Avoid logging secrets like server key here
+    });
+
+    try {
+      // Call Midtrans
+      const transaction = await this.snap.createTransaction(payload);
+
+      // Log full response for debugging (may include token, redirect_url, etc.)
+      try {
+        console.info('PaymentService.createTransaction: midtrans response', JSON.stringify(transaction));
+      } catch (e) {
+        console.info('PaymentService.createTransaction: midtrans response (non-serializable)');
+      }
+
+      return transaction;
+    } catch (err) {
+      // Capture as much context as possible without exposing secrets
+      const extra = {
+        message: err && err.message,
+        stack: err && err.stack,
+        // If using axios or similar, response data may be in err.response.data
+        response: err && err.response && err.response.data ? err.response.data : undefined,
+        payload,
+      };
+      console.error('PaymentService.createTransaction: ERROR calling Midtrans', extra);
+      // rethrow so controller can handle and return appropriate HTTP response
+      throw err;
+    }
   }
 
   // Method untuk verify payment status (dari webhook Midtrans)

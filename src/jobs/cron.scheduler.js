@@ -75,7 +75,7 @@ class CronScheduler {
               await Schedule.findByIdAndUpdate(schedule._id, { status: 'failed', error: 'account_not_resolved' });
               await sendEmail(
                 schedule.user_id.email,
-                'Posting Gagal - SMP Planner',
+                'Posting Gagal - Planoria',
                 `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} gagal karena akun tidak dapat di-resolve. (#account_not_resolved)`
               );
               continue;
@@ -93,7 +93,7 @@ class CronScheduler {
               await Schedule.findByIdAndUpdate(schedule._id, { status: 'failed', error: 'late_publish_failed' });
               await sendEmail(
                 schedule.user_id.email,
-                'Posting Gagal - SMP Planner',
+                'Posting Gagal - Planoria',
                 `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} gagal dipublish. Error: ${pubErr.message}`
               );
               continue;
@@ -103,7 +103,7 @@ class CronScheduler {
             await Schedule.findByIdAndUpdate(schedule._id, { status: 'posted', vendor_job_id: postId });
             await sendEmail(
               schedule.user_id.email,
-              'Posting Berhasil - SMP Planner',
+              'Posting Berhasil - Planoria',
               `Halo ${schedule.user_id.username || ''}, Post ke ${schedule.platform} telah berhasil dipublish pada ${moment().tz('Asia/Jakarta').format('YYYY-MM-DD HH:mm:ss')}.`);
             console.log('[Cron] Posted schedule', schedule._id.toString());
           } catch (innerErr) {

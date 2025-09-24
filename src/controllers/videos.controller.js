@@ -241,6 +241,7 @@ const analyzeVideo = async (req, res) => {
         });
 
         // Extract transcript using service
+        console.log('🎬 Starting transcript extraction for video:', video._id);
         const result = await transcriptService.extractTranscript(
           video._id,
           (progressData) => {
@@ -256,6 +257,12 @@ const analyzeVideo = async (req, res) => {
             io.to(`video-analysis-${id}`).emit('transcript-progress', progressMessage);
           }
         );
+        
+        console.log('📝 Transcript extraction result:', {
+          transcriptLength: result.transcript?.length,
+          processingTime: result.processing_time_ms,
+          confidence: result.confidence_score
+        });
 
         // Update video with transcript result
         video.transcript = result.transcript;
@@ -291,6 +298,12 @@ const analyzeVideo = async (req, res) => {
             platform: 'Social Media'
           };
 
+          console.log('🔄 Preparing AI analysis with data:', {
+            title: contentData.title,
+            scriptLength: contentData.currentScript?.length,
+            hasDescription: !!contentData.description
+          });
+
           // Perform AI analysis
           const aiAnalysisResult = await analyzeContent(contentData);
           console.log('🤖 AI Analysis Result:', JSON.stringify(aiAnalysisResult, null, 2));
@@ -325,7 +338,7 @@ const analyzeVideo = async (req, res) => {
           progress: 100,
           message: 'Analisis video selesai! Hasil tersedia di chat dan saran perbaikan.',
           transcript: result.transcript,
-          analysis: aiAnalysis.analysis
+          analysis: video.aiAnalysis || 'Analisis selesai'
         });
 
       } catch (error) {
@@ -640,60 +653,8 @@ module.exports = {
   // export baru:
   updateVideo,
   deleteVideo,
-  // export analisis:
-  analyzeVideo: async (req, res) => {
-    try {
-      const user_id = req.user.id;
-      const { id } = req.params;
-
-      // Find video owned by user
-      const video = await Video.findOne({ _id: id, user_id });
-      if (!video) {
-        return res.status(404).json({ error: "Video not found" });
-      }
-      
-      console.log('🎬 Video found for analysis:', {
-        id: video._id,
-        title: video.title,
-        transcript_status: video.transcript_status,
-        hasTranscript: !!video.transcript
-      });
-
-      // Check if transcript already exists
-      if (video.transcript_status === 'completed' && video.transcript) {
-        return res.json({ 
-          message: "Video already analyzed",
-          status: "completed",
-          transcript: video.transcript
-        });
-      }
-
-      // Check if analysis is already in progress
-      if (video.transcript_status === 'processing') {
-        console.log('📤 Sending response: Analysis already in progress');
-        const response = { 
-          message: "Analysis already in progress",
-          status: "processing"
-        };
-        console.log('📤 Response data:', response);
-        return res.json(response);
-      }
-
-      console.log('📤 Sending response: Video analysis started');
-      const response = {
-        message: "Video analysis started",
-        status: "processing",
-        videoId: id
-      };
-      console.log('📤 Response data:', response);
-      
-      return res.json(response);
-
-    } catch (err) {
-      console.error("Error analyzeVideo:", err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  },
+  // export analisis (menggunakan function yang benar):
+  analyzeVideo,
   getVideoTranscript,
   chatWithVideo,
   deleteVideoAnalysis,

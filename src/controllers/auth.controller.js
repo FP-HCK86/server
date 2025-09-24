@@ -62,6 +62,9 @@ module.exports = {
           id: user._id,
           username: user.username,
           email: user.email,
+          subscription: user.subscription,
+          isPremium: user.isPremium,
+          subscriptionExpiry: user.subscriptionExpiry,
         },
       });
     } catch (err) {
@@ -114,6 +117,9 @@ module.exports = {
           username: user.username,
           email: user.email,
           avatar: user.avatar,
+          subscription: user.subscription,
+          isPremium: user.isPremium,
+          subscriptionExpiry: user.subscriptionExpiry,
         },
       });
     } catch (err) {
@@ -136,6 +142,9 @@ module.exports = {
           avatar: user.avatar,
           googleId: user.googleId,
           createdAt: user.createdAt,
+          subscription: user.subscription,
+          isPremium: user.isPremium,
+          subscriptionExpiry: user.subscriptionExpiry,
         },
       });
     } catch (err) {
@@ -174,6 +183,9 @@ module.exports = {
           username: user.username,
           email: user.email,
           avatar: user.avatar,
+          subscription: user.subscription,
+          isPremium: user.isPremium,
+          subscriptionExpiry: user.subscriptionExpiry,
         },
       });
     } catch (err) {
@@ -212,6 +224,9 @@ module.exports = {
           username: user.username,
           email: user.email,
           avatar: user.avatar,
+          subscription: user.subscription,
+          isPremium: user.isPremium,
+          subscriptionExpiry: user.subscriptionExpiry,
         },
       });
     } catch (err) {

@@ -425,6 +425,258 @@ class SchedulesController {
       next(error);
     }
   }
+
+  static async getUpcomingSchedules(req, res, next) {
+    try {
+      const user_id = req.user.id;
+      const now = new Date();
+
+      console.log('=== DEBUG: getUpcomingSchedules started for user:', user_id);
+      console.log('=== DEBUG: Current time:', now.toISOString());
+
+      // Get upcoming schedules (scheduled_at > now) sorted by scheduled_at ascending
+      const upcomingSchedules = await Schedule.find({
+        user_id: user_id,
+        scheduled_at: { $gt: now }, // Only future schedules
+        status: { $in: ['pending', 'processing'] } // Only active schedules
+      })
+      .sort({ scheduled_at: 1 }) // Earliest first
+      .limit(4) // Only 4 schedules
+      .lean();
+
+      console.log('=== DEBUG: Found upcoming schedules:', upcomingSchedules.length);
+
+      // Format the schedules for frontend
+      const formattedSchedules = upcomingSchedules.map(schedule => {
+        const scheduledAt = new Date(schedule.scheduled_at);
+        console.log(`=== DEBUG: Processing schedule ${schedule._id}:`);
+        console.log(`    Scheduled at: ${scheduledAt.toISOString()}`);
+        console.log(`    Current time: ${now.toISOString()}`);
+
+        // Calculate time difference in milliseconds
+        const timeDiffMs = scheduledAt.getTime() - now.getTime();
+        
+        // Convert to hours (decimal)
+        const exactHours = timeDiffMs / (1000 * 60 * 60);
+        console.log(`    Exact hours difference: ${exactHours}`);
+        
+        // Get minutes part only (remainder after full hours)
+        const totalMinutes = timeDiffMs / (1000 * 60);
+        const minutesRemainder = totalMinutes % 60;
+        console.log(`    Minutes remainder: ${minutesRemainder}`);
+        
+        // Apply rounding logic: < 30 minutes = Math.floor, >= 30 minutes = Math.ceil
+        let hoursFromNow;
+        if (minutesRemainder < 30) {
+          hoursFromNow = Math.floor(exactHours);
+          console.log(`    Using Math.floor (${minutesRemainder} < 30): ${hoursFromNow}`);
+        } else {
+          hoursFromNow = Math.ceil(exactHours);
+          console.log(`    Using Math.ceil (${minutesRemainder} >= 30): ${hoursFromNow}`);
+        }
+
+        // Ensure minimum of 1 hour display if it's less than 1
+        if (hoursFromNow < 1) {
+          hoursFromNow = 1;
+          console.log(`    Adjusted to minimum 1 hour`);
+        }
+
+        // Format platform names
+        const platformName = schedule.platform === 'instagram' ? 'Instagram' : 'TikTok';
+        const platformPrefix = schedule.platform === 'instagram' ? 'IG Reels' : 'TikTok';
+
+        // Determine date badge logic
+        const hoursUntilScheduled = timeDiffMs / (1000 * 60 * 60);
+        let dateBadge;
+        
+        if (hoursUntilScheduled < 24) {
+          dateBadge = 'Today';
+        } else {
+          // Check if it's tomorrow (24-48 hours)
+          if (hoursUntilScheduled < 48) {
+            dateBadge = 'Tomorrow';
+          } else {
+            // Format as DD-MM-YYYY for dates beyond tomorrow
+            dateBadge = scheduledAt.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit', 
+              year: 'numeric'
+            });
+          }
+        }
+
+        console.log(`    Hours until scheduled: ${hoursUntilScheduled}`);
+        console.log(`    Date badge: ${dateBadge}`);
+
+        return {
+          id: schedule._id,
+          title: `${platformPrefix}: ${schedule.caption}`,
+          date: `${hoursFromNow} hours from now`,
+          platform: platformName,
+          dateBadge: dateBadge,
+          scheduled_at: schedule.scheduled_at
+        };
+      });
+
+      console.log('=== DEBUG: Formatted upcoming schedules:', formattedSchedules);
+
+      res.status(200).json({
+        success: true,
+        data: formattedSchedules
+      });
+    } catch (error) {
+      console.error('Error fetching upcoming schedules:', error);
+      next(error);
+    }
+  }
+
+  static async getDashboardStats(req, res, next) {
+    try {
+      const user_id = req.user.id;
+
+      console.log('=== DEBUG: getDashboardStats started for user:', user_id);
+
+      // Count total unique videos from schedules (distinct video_ids)
+      const totalVideosResult = await Schedule.aggregate([
+        { $match: { user_id: new mongoose.Types.ObjectId(user_id) } },
+        { $group: { _id: "$video_id" } },
+        { $count: "total" }
+      ]);
+      const totalVideos = totalVideosResult.length > 0 ? totalVideosResult[0].total : 0;
+
+      console.log('=== DEBUG: Total unique videos:', totalVideos);
+
+      // Count scheduled (pending or processing status)
+      const scheduledCount = await Schedule.countDocuments({
+        user_id: user_id,
+        status: { $in: ['pending', 'processing'] }
+      });
+
+      console.log('=== DEBUG: Scheduled count:', scheduledCount);
+
+      // Count posted schedules
+      const postedCount = await Schedule.countDocuments({
+        user_id: user_id,
+        status: 'posted'
+      });
+
+      console.log('=== DEBUG: Posted count:', postedCount);
+
+      // Count failed schedules
+      const failedCount = await Schedule.countDocuments({
+        user_id: user_id,
+        status: 'failed'
+      });
+
+      console.log('=== DEBUG: Failed count:', failedCount);
+
+      const stats = {
+        totalVideos,
+        scheduled: scheduledCount,
+        posted7d: postedCount,
+        failed7d: failedCount
+      };
+
+      console.log('=== DEBUG: Dashboard stats result:', stats);
+
+      res.status(200).json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      next(error);
+    }
+  }
+
+  static async getContentAnalytics(req, res, next) {
+    try {
+      console.log('=== DEBUG: Starting content analytics...');
+      
+      // Get content style analytics
+      const contentStyleAnalytics = await Schedule.aggregate([
+        {
+          $match: {
+            status: 'posted'
+          }
+        },
+        {
+          $lookup: {
+            from: 'personas',
+            localField: 'persona_id',
+            foreignField: '_id',
+            as: 'persona'
+          }
+        },
+        {
+          $unwind: '$persona'
+        },
+        {
+          $group: {
+            _id: '$persona.contentStyle',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { count: -1 }
+        }
+      ]);
+
+      // Get brand voice analytics
+      const brandVoiceAnalytics = await Schedule.aggregate([
+        {
+          $match: {
+            status: 'posted'
+          }
+        },
+        {
+          $lookup: {
+            from: 'personas',
+            localField: 'persona_id',
+            foreignField: '_id',
+            as: 'persona'
+          }
+        },
+        {
+          $unwind: '$persona'
+        },
+        {
+          $group: {
+            _id: '$persona.brandVoice',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { count: -1 }
+        }
+      ]);
+
+      console.log('=== DEBUG: Content style analytics:', contentStyleAnalytics);
+      console.log('=== DEBUG: Brand voice analytics:', brandVoiceAnalytics);
+
+      // Format data for radar charts
+      const contentStyleFormatted = contentStyleAnalytics.map(item => ({
+        label: item._id,
+        value: item.count
+      }));
+
+      const brandVoiceFormatted = brandVoiceAnalytics.map(item => ({
+        label: item._id,
+        value: item.count
+      }));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          contentStyle: contentStyleFormatted,
+          brandVoice: brandVoiceFormatted
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching content analytics:', error);
+      next(error);
+    }
+  }
 }
 
 module.exports = SchedulesController;

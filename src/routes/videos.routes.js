@@ -10,6 +10,7 @@ const {
     getVideo,
     updateVideo,
     deleteVideo,
+    getRecentScheduledVideos,
 } = require('../controllers/videos.controller');
 
 // JWT Authentication middleware
@@ -20,6 +21,9 @@ router.post('/', authenticateToken, uploadVideo.single('file'), uploadVideoCtrl)
 
 // READ (list milik user)
 router.get('/', authenticateToken, listMyVideos);
+
+// READ (recent scheduled videos for dashboard)
+router.get('/recent-scheduled', authenticateToken, getRecentScheduledVideos);
 
 // READ (detail video milik user)
 router.get('/:id', authenticateToken, getVideo);

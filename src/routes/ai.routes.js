@@ -8,6 +8,7 @@ const {
   healthCheckController 
 } = require('../controllers/ai.controller');
 const { aiRateLimit } = require('../middlewares/aiRateLimit');
+const { authenticateToken } = require('../middlewares/auth');
 
 // Middleware for request logging (optional)
 const requestLogger = (req, res, next) => {
@@ -29,15 +30,15 @@ const aiRateLimitMiddleware = aiRateLimit({
 router.get('/health', healthCheckController);
 
 // Generate content from prompt (Mode 1: Create content from scratch)
-router.post('/generate-content', aiRateLimitMiddleware, generateContentController);
+router.post('/generate-content', authenticateToken, aiRateLimitMiddleware, generateContentController);
 
 // Chat with AI for brainstorming and refinement
-router.post('/chat', aiRateLimitMiddleware, chatController);
+router.post('/chat', authenticateToken, aiRateLimitMiddleware, chatController);
 
 // Analyze existing content and provide improvement suggestions (Mode 2: Analyze existing content)
-router.post('/analyze-content', aiRateLimitMiddleware, analyzeContentController);
+router.post('/analyze-content', authenticateToken, aiRateLimitMiddleware, analyzeContentController);
 
 // Generate trending content ideas based on niche/persona
-router.post('/trending-ideas', aiRateLimitMiddleware, trendingIdeasController);
+router.post('/trending-ideas', authenticateToken, aiRateLimitMiddleware, trendingIdeasController);
 
 module.exports = router;

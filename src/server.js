@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 const env = require('./config/env');
 const { connectDB } = require('./config/mongodb');
 const CronScheduler = require('./jobs/cron.scheduler');
@@ -8,6 +10,19 @@ const CronScheduler = require('./jobs/cron.scheduler');
 const authRoutes = require('./routes/auth.routes')
 const PORT = env.port;
 const app = express();
+const server = http.createServer(app);
+
+// Configure Socket.IO with CORS
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Attach Socket.IO instance to app for use in controllers
+app.set('io', io);
 
 // CORS configuration
 // const corsOptions = {
@@ -79,6 +94,21 @@ app.use(errorHandler);
 // Start cron after DB connect
 // CronScheduler.start();
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  // Join video analysis room for progress updates
+  socket.on('join-video-analysis', (videoId) => {
+    socket.join(`video-analysis-${videoId}`);
+    console.log(`Socket ${socket.id} joined room video-analysis-${videoId}`);
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
 // CHECK CONNECTION DATABASE
 connectDB().then(() => {
   CronScheduler.start();
@@ -88,7 +118,8 @@ connectDB().then(() => {
   } catch (e) {
     console.warn('Failed to start downgradeSubscriptions job', e && e.message);
   }
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Socket.IO server ready for connections`);
   });
 });

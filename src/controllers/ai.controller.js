@@ -5,7 +5,8 @@ const {
   generateTrendingIdeas,
   chatWithPersona,
   analyzeContentWithPersona,
-  generateTrendingIdeasWithPersona
+  generateTrendingIdeasWithPersona,
+  chatWithVideoContext
 } = require('../services/ai.service');
 const Persona = require('../models/Persona');
 
@@ -15,8 +16,12 @@ const Persona = require('../models/Persona');
  */
 const generateContentController = async (req, res) => {
   try {
-    const { prompt, usePersona = false, userId } = req.body;
+    const { prompt, usePersona = false, userId, userSubscription = 'free' } = req.body;
     const userIdFromAuth = req.userId || userId; // From auth middleware or request body
+
+    console.log(`[AI API] POST /generate-content - ${new Date().toISOString()}`);
+    console.log(`[AI CONTROLLER DEBUG] userSubscription received: "${userSubscription}" (type: ${typeof userSubscription})`);
+    console.log(`[AI CONTROLLER DEBUG] req.body:`, JSON.stringify(req.body, null, 2));
 
     // Validation
     if (!prompt) {
@@ -53,7 +58,7 @@ const generateContentController = async (req, res) => {
     }
 
         // Generate content using AI service (with persona if available)
-    const result = await generateContent(prompt, persona);
+    const result = await generateContent(prompt, persona, userSubscription);
 
     // Update persona usage if used
     if (persona) {
@@ -365,10 +370,88 @@ const healthCheckController = async (req, res) => {
   }
 };
 
+/**
+ * Chat with AI using video transcript context
+ * POST /ai/chat-video-context
+ */
+const chatVideoContextController = async (req, res) => {
+  try {
+    const { messages, videoContext } = req.body;
+
+    // Validation
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Messages array is required'
+      });
+    }
+
+    if (messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one message is required'
+      });
+    }
+
+    // Validate message format
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      if (!message.role || !message.content) {
+        return res.status(400).json({
+          success: false,
+          message: `Message at index ${i} is missing role or content`
+        });
+      }
+
+      if (!['user', 'assistant'].includes(message.role)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid role "${message.role}" at message index ${i}. Must be "user" or "assistant"`
+        });
+      }
+    }
+
+    // Video context validation (optional but recommended)
+    if (videoContext && (!videoContext.title || !videoContext._id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Video context must include title and _id'
+      });
+    }
+
+    // Call AI service with video context
+    const result = await chatWithVideoContext(messages, videoContext);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Chat response generated successfully',
+      data: {
+        response: result.response,
+        usage: result.usage,
+        videoContext: videoContext ? {
+          id: videoContext._id,
+          title: videoContext.title,
+          hasTranscript: !!videoContext.transcript
+        } : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Video Context Chat Error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate chat response with video context',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
 module.exports = {
   generateContentController,
   chatController,
   analyzeContentController,
   trendingIdeasController,
-  healthCheckController
+  healthCheckController,
+  chatVideoContextController
 };

@@ -18,6 +18,26 @@ class CronScheduler {
       try {
         const now = new Date();
 
+        // Heuristic: mark schedules handed to Late (have vendor_job_id) as posted
+        // once their scheduled time has passed by at least 60s. This prevents UI
+        // from showing perpetual pending after we stopped locally re-publishing them.
+        try {
+          const graceCutoff = new Date(Date.now() - 60 * 1000); // 60s grace
+            const autoResult = await Schedule.updateMany(
+              {
+                status: 'pending',
+                vendor_job_id: { $exists: true },
+                scheduled_at: { $lte: graceCutoff }
+              },
+              { $set: { status: 'posted', auto_marked: true, posted_at: new Date() } }
+            );
+            if (autoResult.modifiedCount) {
+              console.log('[Cron] Auto-marked remote scheduled as posted:', autoResult.modifiedCount);
+            }
+        } catch (autoErr) {
+          console.warn('[Cron] auto-mark check failed:', autoErr.message);
+        }
+
         // Ambil batch pending (limit untuk hindari memory blow). Gunakan findOneAndUpdate loop untuk atomic claim.
         const batchSize = 10; // adjustable
         let claimed = [];
@@ -25,7 +45,10 @@ class CronScheduler {
           const doc = await Schedule.findOneAndUpdate(
             {
               scheduled_at: { $lte: now },
-              status: 'pending'
+              status: 'pending',
+              // Minimal safeguard: if a schedule already has vendor_job_id it was handed to Late's own scheduler.
+              // We skip it to avoid duplicate publish (Late will publish at its scheduled time).
+              vendor_job_id: { $exists: false }
             },
             { $set: { status: 'processing', locked_at: new Date() } },
             { new: true }

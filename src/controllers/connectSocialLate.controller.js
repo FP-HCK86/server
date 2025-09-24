@@ -78,7 +78,17 @@ exports.startConnect = async (req, res) => {
       await vendorAccount.save();
     }
 
-    const redirectUrl = `${req.protocol}://${req.get("host")}/connect/callback/${platform}`;
+    // Allow explicit callback override from config (useful if Late expects a fixed HTTPS domain)
+    let redirectUrl = `${req.protocol}://${req.get("host")}/connect/callback/${platform}`;
+    try {
+      if (platform === 'tiktok' && config.TIKTOK_CALLBACK_URL) {
+        redirectUrl = config.TIKTOK_CALLBACK_URL;
+      } else if (platform === 'instagram' && config.INSTAGRAM_CALLBACK_URL) {
+        redirectUrl = config.INSTAGRAM_CALLBACK_URL;
+      }
+    } catch (e) {
+      console.warn('Callback override resolution failed, falling back to computed URL:', e.message);
+    }
 
     console.log('Calling Late API:', {
       url: `${config.LATE_BASE_URL}/connect/${platform}`,
@@ -165,15 +175,28 @@ exports.startConnect = async (req, res) => {
 exports.connectCallback = async function connectCallback(req, res) {
   try {
     const { profileId, username, error: oauthError, connected } = req.query;
-    const platform = connected || req.params.platform;
+    const rawPlatformParam = req.params.platform;
+    // Canonicalize platform: Late seems to append a state token like tiktok-ct_<hash> in path.
+    const canonicalFromPath = (p) => {
+      if (!p) return p;
+      // Current observed pattern: tiktok-ct_<hex>
+      if (p.startsWith('tiktok-ct_')) return 'tiktok';
+      if (p.startsWith('instagram-ct_')) return 'instagram';
+      return p;
+    };
+    const platform = connected || canonicalFromPath(rawPlatformParam);
     
     // For callback, we might not have authenticated user, so handle gracefully
     // If we need userId, we can get it from profileId or make callback public
-    console.log('Callback received:', { profileId, username, platform, oauthError });
+    console.log('Callback received:', { profileId, username, platform, rawPlatformParam, oauthError });
 
     // Short-circuit on error returned by Late
     if (oauthError) {
-      return res.status(400).json({ error: oauthError });
+      return res.status(400).json({
+        error: oauthError,
+        platform,
+        hint: 'OAuth handshake failed upstream (Late/TikTok). Platform canonicalized.',
+      });
     }
     if (!profileId || !platform || !username) {
       return res.status(400).json({ error: 'Missing required OAuth parameters' });
